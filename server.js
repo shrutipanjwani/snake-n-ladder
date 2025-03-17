@@ -88,6 +88,7 @@ app.prepare().then(() => {
       }
 
       console.log('Admin end game request received');
+      
       // Find any active game
       for (const [gameId, game] of activeGames.entries()) {
         // Notify all players that game has ended
@@ -95,7 +96,10 @@ app.prepare().then(() => {
           const playerSocket = io.sockets.sockets.get(player.id);
           if (playerSocket) {
             console.log('Sending gameEnded event to player:', player.id);
-            playerSocket.emit('gameEnded', { message: 'Game ended by admin' });
+            // Send the game end event with the player's final position
+            playerSocket.emit('gameEnded', { 
+              message: 'Game ended by admin'
+            });
           }
         });
         
@@ -259,7 +263,9 @@ app.prepare().then(() => {
     });
 
     // Handle dice roll
-    socket.on('rollDice', ({ playerId, roll }) => {
+    socket.on('rollDice', ({ playerId, value }) => {
+      console.log('Received dice roll:', { playerId, value });
+      
       let gameId = null;
       let currentGame = null;
       
@@ -272,27 +278,28 @@ app.prepare().then(() => {
         }
       }
       
-      if (!gameId || !currentGame) return;
+      if (!gameId || !currentGame) {
+        console.log('No active game found for player:', playerId);
+        socket.emit('error', { message: 'No active game found' });
+        return;
+      }
       
       const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
-      if (playerIndex === -1) return;
+      if (playerIndex === -1) {
+        console.log('Player not found in game:', playerId);
+        socket.emit('error', { message: 'Player not found in game' });
+        return;
+      }
       
       const player = currentGame.players[playerIndex];
-      if (player.hasWon) return; // Don't allow moves if player has won
+      if (player.hasWon) {
+        socket.emit('error', { message: 'Player has already won' });
+        return;
+      }
       
       // Calculate new position
-      const newPosition = Math.min(50, player.position + roll);
+      const newPosition = Math.min(50, player.position + value);
       currentGame.players[playerIndex].position = newPosition;
-      
-      // Check if landed on QR code position
-      const qrTaskId = hasQRCode(newPosition);
-      if (qrTaskId) {
-        socket.emit('requireQRScan', {
-          playerId,
-          position: newPosition,
-          taskId: qrTaskId
-        });
-      }
       
       // Check for win condition
       if (newPosition >= 50) {
@@ -303,10 +310,18 @@ app.prepare().then(() => {
       // Update game state
       activeGames.set(gameId, currentGame);
       
-      // Send update only to the player who rolled
-      socket.emit('gameUpdate', {
-        player: currentGame.players[playerIndex],
-        position: newPosition
+      // Send update to the player who rolled
+      console.log('Sending dice roll result:', {
+        value,
+        newPosition,
+        hasWon: currentGame.players[playerIndex].hasWon
+      });
+      
+      // Send the result back to the same socket that sent the roll
+      socket.emit('diceRollResult', {
+        value,
+        newPosition,
+        hasWon: currentGame.players[playerIndex].hasWon
       });
     });
 
@@ -325,6 +340,38 @@ app.prepare().then(() => {
       waitingPlayers.push(player);
       console.log('Added player to waiting list:', player);
       io.emit('lobbyUpdate', waitingPlayers);
+    });
+
+    // Handle end game
+    socket.on('endGame', () => {
+      console.log('End game request received from:', socket.id);
+      
+      // Check if the request is from the admin
+      if (socket.id !== adminSocketId) {
+        console.log('Unauthorized end game attempt from:', socket.id);
+        socket.emit('error', { message: 'Only admin can end the game' });
+        return;
+      }
+
+      // Get all players in the game
+      const gameRoom = Array.from(io.sockets.adapter.rooms.get('game') || []);
+      console.log('Players in game:', gameRoom);
+
+      // Notify all players that the game has ended
+      io.to('game').emit('gameEnded', { message: 'Game ended by admin' });
+      
+      // Disconnect all players from the game room
+      gameRoom.forEach(playerSocketId => {
+        const playerSocket = io.sockets.sockets.get(playerSocketId);
+        if (playerSocket) {
+          playerSocket.leave('game');
+          console.log('Player disconnected from game:', playerSocketId);
+        }
+      });
+
+      // Clear game state
+      activeGames.clear();
+      console.log('Game state cleared');
     });
   });
 
