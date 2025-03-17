@@ -9,13 +9,14 @@ import { Player } from '../../lib/types';
 export default function PlayerGame() {
   const params = useParams();
   const router = useRouter();
-  const { currentPlayer, gameId } = useGameStore();
+  const { currentPlayer, gameId, isHydrated } = useGameStore();
   
   console.log('PlayerGame Component Mounted:', {
     params,
     currentPlayer,
     gameId,
-    socketId: socket.id
+    socketId: socket.id,
+    isHydrated
   });
 
   const [gameState, setGameState] = useState({
@@ -24,6 +25,15 @@ export default function PlayerGame() {
     lastRoll: null as number | null,
     canRoll: true,
   });
+
+  // Wait for store to be hydrated
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl font-semibold">Loading game state...</div>
+      </div>
+    );
+  }
 
   // Handle initial state and reconnection
   useEffect(() => {
@@ -44,7 +54,8 @@ export default function PlayerGame() {
       gameId,
       currentPlayer,
       paramsPlayerId: params.playerId,
-      socketId: socket.id
+      socketId: socket.id,
+      isHydrated
     });
 
     if (!gameId || !currentPlayer) {
@@ -63,7 +74,7 @@ export default function PlayerGame() {
     }
 
     console.log('Player page validated - staying on current page');
-  }, [gameId, currentPlayer, params.playerId, router]);
+  }, [gameId, currentPlayer, params.playerId, router, isHydrated]);
 
   useEffect(() => {
     // Listen for game updates

@@ -23,6 +23,39 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
+    // Handle admin starting the game
+    socket.on('adminStartGame', () => {
+      console.log('Admin start game request received');
+      if (waitingPlayers.length === 4) {
+        console.log('Starting new game via admin request');
+        startNewGame();
+      } else {
+        console.log('Admin start game request rejected - not enough players:', waitingPlayers.length);
+        socket.emit('error', { 
+          message: 'Cannot start game - need exactly 4 players' 
+        });
+      }
+    });
+
+    // Handle admin ending the game
+    socket.on('adminEndGame', () => {
+      console.log('Admin end game request received');
+      // Find any active game
+      for (const [gameId, game] of activeGames.entries()) {
+        // Notify all players that game has ended
+        game.players.forEach(player => {
+          const playerSocket = io.sockets.sockets.get(player.id);
+          if (playerSocket) {
+            playerSocket.emit('gameEnded', { message: 'Game ended by admin' });
+          }
+        });
+        
+        // Clear the game
+        activeGames.delete(gameId);
+        console.log('Game ended by admin:', gameId);
+      }
+    });
+
     // Handle player rejoining game
     socket.on('rejoinGame', ({ gameId, player }) => {
       const game = activeGames.get(gameId);
@@ -49,10 +82,10 @@ app.prepare().then(() => {
     // Player joins lobby
     socket.on('joinLobby', (player) => {
       const newPlayer = {
-        id: player.testId || socket.id, // Use testId if provided, otherwise socket.id
+        id: player.testId || socket.id,
         name: player.name,
         position: 0,
-        corner: -1, // Will be assigned when game starts
+        corner: -1
       };
       
       // Check if player with same ID already exists
@@ -68,11 +101,6 @@ app.prepare().then(() => {
       io.emit('lobbyUpdate', waitingPlayers);
       
       console.log(`${player.name} joined the lobby. Waiting players: ${waitingPlayers.length}`);
-      
-      // Start game if we have 4 players
-      if (waitingPlayers.length === 4) {
-        startNewGame();
-      }
     });
 
     // Player scanned QR code
@@ -220,7 +248,7 @@ app.prepare().then(() => {
     });
   });
 
-  // Function to start a new game when 4 players are ready
+  // Function to start a new game when admin initiates
   function startNewGame() {
     if (waitingPlayers.length < 4) return;
     
@@ -241,40 +269,43 @@ app.prepare().then(() => {
     // Create new game state
     const newGame = {
       id: gameId,
-      players: gamePlayers.map(player => ({
+      players: gamePlayers.map((player, index) => ({
         ...player,
         position: 0,
-        hasWon: false
+        hasWon: false,
+        isAdmin: index === 0 // First player is admin
       })),
       tasks: generateTasks(),
       startTime: Date.now()
     };
     
-    // Store the game
+    // Store game state
     activeGames.set(gameId, newGame);
-    
-    // Notify all players that the game is starting with their specific URLs
+
+    // Notify each player about game start with all players' info
     gamePlayers.forEach(player => {
       const socket = io.sockets.sockets.get(player.id);
       if (socket) {
         console.log('Starting game for player:', {
           playerId: player.id,
           playerName: player.name,
+          isAdmin: player.isAdmin,
           gameUrl: `/game/${player.id}`
         });
         
         socket.emit('gameStart', {
           gameId,
-          player: player,
+          player,
+          players: newGame.players,
           gameUrl: `/game/${player.id}`
         });
       }
     });
+
+    // Notify all clients in lobby that these players have left
+    io.to('lobby').emit('updateLobby', { waitingPlayers });
     
     console.log(`Game started with players: ${gamePlayers.map(p => p.name).join(', ')}`);
-    
-    // Update the lobby for everyone else
-    io.emit('lobbyUpdate', waitingPlayers);
   }
 
   // Function to generate spiritual tasks

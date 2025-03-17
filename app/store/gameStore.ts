@@ -1,11 +1,12 @@
 // src/store/gameStore.ts
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { getSocket } from '../lib/socket';
 import { GameState, Player, Task, TaskResult } from '../lib/types';
 
 interface GameStore extends GameState {
   currentPlayer: Player | null;
+  isHydrated: boolean;
   // Player actions
   setPlayerName: (name: string) => void;
   joinGame: () => void;
@@ -31,6 +32,7 @@ const initialState: GameState = {
   winner: null,
   currentTask: null,
   taskResult: null,
+  isHydrated: false,
 };
 
 // Create the store with persistence
@@ -65,43 +67,93 @@ export const useGameStore = create<GameStore>()(
         }
       });
 
-      socket.on('gameStart', (data: { gameId: string, player: Player, gameUrl: string }) => {
+      socket.on('gameStart', (data: { gameId: string, player: Player, players: Player[], gameUrl: string }) => {
         console.log('Game Start Event Received:', {
           gameId: data.gameId,
           playerId: data.player.id,
           playerName: data.player.name,
-          gameUrl: data.gameUrl
+          gameUrl: data.gameUrl,
+          allPlayers: data.players
         });
 
-        // First update the state
-        set({ 
+        // First update the state with all players
+        const state = get();
+        const updatedState = { 
+          ...state,
           gameId: data.gameId,
           currentPlayer: data.player,
-          players: [data.player],
+          players: data.players,
           isInLobby: false,
           isInGame: true
+        };
+        
+        // Set state and ensure it's persisted
+        set(updatedState);
+        
+        // Double check state was updated correctly
+        const newState = get();
+        console.log('State after update:', {
+          gameId: newState.gameId,
+          currentPlayer: newState.currentPlayer,
+          players: newState.players,
+          isInGame: newState.isInGame
         });
 
-        // Wait for state to be persisted before redirecting
-        setTimeout(() => {
-          if (typeof window !== 'undefined') {
-            window.location.href = data.gameUrl;
-          }
-        }, 100);
+        // Use Next.js router for navigation to maintain state
+        if (typeof window !== 'undefined') {
+          const router = require('next/navigation').useRouter();
+          router.push(data.gameUrl);
+        }
+      });
+
+      // Handle game ending
+      socket.on('gameEnded', () => {
+        const state = get();
+        console.log('Game ended by admin, clearing state');
+        
+        // Clear game state but keep player info
+        const clearedState = {
+          ...initialState,
+          currentPlayer: state.currentPlayer,
+          isHydrated: true
+        };
+        
+        set(clearedState);
+        
+        // Redirect to lobby
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+      });
+
+      socket.on('error', (data: { message: string }) => {
+        console.error('Game error:', data.message);
       });
 
       return {
         ...initialState,
+        isHydrated: false,
         
         setPlayerName: (name: string) => {
           const socket = getSocket();
           if (!socket.id) return;
           
           const newPlayer = { id: socket.id, name, position: 0, corner: -1 };
-          set({ 
+          const updatedState = { 
             currentPlayer: newPlayer,
             players: [newPlayer],
-            isInLobby: true 
+            isInLobby: true,
+            isHydrated: true
+          };
+          
+          set(updatedState);
+          
+          // Verify state was updated
+          const state = get();
+          console.log('State after setPlayerName:', {
+            currentPlayer: state.currentPlayer,
+            players: state.players,
+            isInLobby: state.isInLobby
           });
         },
 
@@ -118,7 +170,9 @@ export const useGameStore = create<GameStore>()(
         },
 
         resetGame: () => {
-          set(initialState);
+          console.log('Resetting game state');
+          localStorage.removeItem('game-storage');
+          set({ ...initialState, isHydrated: true });
         },
 
         // ... rest of your existing methods ...
@@ -186,27 +240,24 @@ export const useGameStore = create<GameStore>()(
     },
     {
       name: 'game-storage',
-      partialize: (state) => ({
-        gameId: state.gameId,
-        currentPlayer: state.currentPlayer,
-        isInGame: state.isInGame,
-        isInLobby: state.isInLobby,
-        players: state.players // Also persist players array
-      }),
-      // Add storage configuration
-      storage: {
-        getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          const data = JSON.parse(str);
-          console.log('Loading state from storage:', data);
-          return data;
-        },
-        setItem: (name, value) => {
-          console.log('Saving state to storage:', value);
-          localStorage.setItem(name, JSON.stringify(value));
-        },
-        removeItem: (name) => localStorage.removeItem(name)
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => {
+        const persistedState = {
+          gameId: state.gameId,
+          currentPlayer: state.currentPlayer,
+          players: state.players,
+          isInGame: state.isInGame,
+          isInLobby: state.isInLobby,
+          isHydrated: true
+        };
+        console.log('Persisting state:', persistedState);
+        return persistedState;
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          console.log('Rehydrated state:', state);
+          state.isHydrated = true;
+        }
       }
     }
   )

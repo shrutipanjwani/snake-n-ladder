@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
 import { Player } from '../lib/types';
+import { useGameStore } from '../store/gameStore';
 
 interface LobbyScreenProps {
   waitingPlayers: Player[];
@@ -14,7 +15,16 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({
   isJoined = false 
 }) => {
   const [playerName, setPlayerName] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const gameStore = useGameStore();
   
+  useEffect(() => {
+    // Check if this is the first player (admin)
+    if (waitingPlayers.length === 1 && waitingPlayers[0]?.id === gameStore.currentPlayer?.id) {
+      setIsAdmin(true);
+    }
+  }, [waitingPlayers, gameStore.currentPlayer]);
+
   const handleJoinLobby = (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim()) return;
@@ -22,6 +32,17 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({
     socket.emit('joinLobby', {
       name: playerName
     });
+  };
+
+  const handleStartGame = () => {
+    if (waitingPlayers.length === 4) {
+      socket.emit('adminStartGame');
+    }
+  };
+
+  const handleEndGame = () => {
+    socket.emit('adminEndGame');
+    gameStore.resetGame();
   };
   
   return (
@@ -54,10 +75,10 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
       <div className="mt-6">
         <h2 className="text-lg font-semibold mb-2">
-          Waiting Players ({(waitingPlayers || []).length}/4):
+          Waiting Players ({waitingPlayers.length}/4):
         </h2>
         <ul className="space-y-2">
-          {(waitingPlayers || []).map((player) => (
+          {waitingPlayers.map((player) => (
             <li
               key={player.id}
               className="bg-gray-50 p-2 rounded-md flex justify-between items-center"
@@ -67,6 +88,24 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({
             </li>
           ))}
         </ul>
+
+        {isAdmin && waitingPlayers.length === 4 && (
+          <button
+            onClick={handleStartGame}
+            className="mt-4 w-full py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Start Game
+          </button>
+        )}
+
+        {isAdmin && gameStore.isInGame && (
+          <button
+            onClick={handleEndGame}
+            className="mt-2 w-full py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            End Game
+          </button>
+        )}
       </div>
     </div>
   );

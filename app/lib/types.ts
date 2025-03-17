@@ -33,6 +33,7 @@ export interface GameState {
   winner: Player | null;
   currentTask: Task | null;
   taskResult: TaskResult | null;
+  isHydrated: boolean;
 }
 
 export interface QRCodeData {
