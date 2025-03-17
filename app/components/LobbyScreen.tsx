@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { socket } from '../lib/socket';
 import { Player } from '../lib/types';
-import { useGameStore } from '../store/gameStore';
 
 interface LobbyScreenProps {
   waitingPlayers: Player[];
@@ -11,96 +11,58 @@ interface LobbyScreenProps {
 
 const LobbyScreen: React.FC<LobbyScreenProps> = ({ waitingPlayers, isJoined }) => {
   const [playerName, setPlayerName] = useState('');
-  const setPlayerNameAndJoin = useGameStore(state => state.setPlayerName);
-  const joinGame = useGameStore(state => state.joinGame);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleJoinLobby = (e: React.FormEvent) => {
     e.preventDefault();
-    if (playerName.trim()) {
-      setPlayerNameAndJoin(playerName);
-      joinGame();
-    }
+    if (!playerName.trim()) return;
+
+    socket.emit('joinLobby', {
+      name: playerName
+    });
   };
   
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-      <div className="bg-indigo-600 text-white p-6 text-center">
-        <h1 className="text-2xl font-bold">Nirankari Youth Symposium</h1>
-        <h2 className="text-lg mt-1">Spiritual Snake and Ladder Game</h2>
-      </div>
+    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+      <h1 className="text-2xl font-bold mb-4">Game Lobby</h1>
       
-      <div className="p-6">
-        {!isJoined ? (
+      {!isJoined && (
+        <form onSubmit={handleJoinLobby} className="space-y-4">
           <div>
-            <p className="text-gray-600 mb-4 text-center">
-              Enter your name to join the game. The game will start when 4 players have joined.
-            </p>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter your name"
-                  required
-                />
-              </div>
-              
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
-              >
-                Join Game
-              </button>
-            </form>
+            <label className="block text-sm font-medium text-gray-700">
+              Player Name
+            </label>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              placeholder="Enter your name"
+            />
           </div>
-        ) : (
-          <div>
-            <p className="text-center font-medium text-lg mb-2">
-              Waiting for players...
-            </p>
-            <p className="text-center text-gray-600 mb-6">
-              {waitingPlayers.length}/4 players have joined
-            </p>
-            
-            <div className="space-y-2">
-              {waitingPlayers.map((player, index) => (
-                <div 
-                  key={player.id}
-                  className="p-3 border rounded-md bg-indigo-50 flex items-center"
-                >
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold mr-3">
-                    {index + 1}
-                  </div>
-                  <span className="font-medium">{player.name}</span>
-                </div>
-              ))}
-              
-              {/* Empty slots */}
-              {Array.from({ length: Math.max(0, 4 - waitingPlayers.length) }).map((_, index) => (
-                <div 
-                  key={`empty-${index}`}
-                  className="p-3 border rounded-md border-dashed flex items-center text-gray-400"
-                >
-                  <div className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3">
-                    {waitingPlayers.length + index + 1}
-                  </div>
-                  <span>Waiting for player...</span>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-6 text-center text-gray-600">
-              Game will start automatically when 4 players have joined
-            </div>
-          </div>
-        )}
+          
+          
+          <button
+            type="submit"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Join Game
+          </button>
+        </form>
+      )}
+
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold mb-2">Waiting Players ({waitingPlayers.length}/4):</h2>
+        <ul className="space-y-2">
+          {waitingPlayers.map((player) => (
+            <li
+              key={player.id}
+              className="bg-gray-50 p-2 rounded-md flex justify-between items-center"
+            >
+              <span>{player.name}</span>
+              <span className="text-sm text-gray-500">#{player.id.slice(-4)}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

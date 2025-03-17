@@ -26,11 +26,18 @@ app.prepare().then(() => {
     // Player joins lobby
     socket.on('joinLobby', (player) => {
       const newPlayer = {
-        id: socket.id,
+        id: player.testId || socket.id, // Use testId if provided, otherwise socket.id
         name: player.name,
         position: 0,
         corner: -1, // Will be assigned when game starts
       };
+      
+      // Check if player with same ID already exists
+      const existingPlayerIndex = waitingPlayers.findIndex(p => p.id === newPlayer.id);
+      if (existingPlayerIndex !== -1) {
+        socket.emit('error', { message: 'Player already exists' });
+        return;
+      }
       
       waitingPlayers.push(newPlayer);
       
