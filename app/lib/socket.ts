@@ -1,9 +1,14 @@
 import { io } from 'socket.io-client';
 
-// Create socket instance
+// Create socket instance with optimized settings
 export const socket = io('http://localhost:3000', {
   autoConnect: true,
   reconnection: true,
+  reconnectionAttempts: 3,
+  reconnectionDelay: 1000,
+  timeout: 5000,
+  transports: ['websocket'],
+  forceNew: true
 });
 
 // Export initialize function for components that need to ensure socket is ready

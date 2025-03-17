@@ -10,6 +10,7 @@ const handle = app.getRequestHandler();
 // Game state
 const waitingPlayers = [];
 const activeGames = new Map();
+let adminSocketId = null; // Track admin socket ID
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -23,22 +24,69 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
+    // Handle admin connection
+    socket.on('adminConnect', () => {
+      console.log('Admin connection request from:', socket.id);
+      
+      // If no admin exists, make this connection the admin
+      if (!adminSocketId) {
+        adminSocketId = socket.id;
+        socket.isAdmin = true;
+        socket.emit('adminConnected', { success: true });
+        // Send initial lobby state to admin
+        socket.emit('lobbyUpdate', waitingPlayers);
+        console.log('New admin authenticated:', socket.id);
+      } else {
+        // If admin already exists, check if this is the admin
+        if (socket.id === adminSocketId) {
+          socket.isAdmin = true;
+          socket.emit('adminConnected', { success: true });
+          socket.emit('lobbyUpdate', waitingPlayers);
+          console.log('Existing admin reconnected:', socket.id);
+        } else {
+          socket.emit('adminConnected', { 
+            success: false, 
+            message: 'Admin already exists' 
+          });
+          console.log('Admin connection rejected - admin already exists');
+        }
+      }
+    });
+
+    // Handle lobby state requests
+    socket.on('requestLobbyState', () => {
+      console.log('Lobby state requested by:', socket.id);
+      socket.emit('lobbyUpdate', waitingPlayers);
+    });
+
     // Handle admin starting the game
     socket.on('adminStartGame', () => {
+      if (!socket.isAdmin) {
+        console.log('Unauthorized attempt to start game');
+        socket.emit('error', { message: 'Unauthorized' });
+        return;
+      }
+
       console.log('Admin start game request received');
-      if (waitingPlayers.length === 4) {
+      if (waitingPlayers.length > 0) {
         console.log('Starting new game via admin request');
         startNewGame();
       } else {
-        console.log('Admin start game request rejected - not enough players:', waitingPlayers.length);
+        console.log('Admin start game request rejected - no players waiting');
         socket.emit('error', { 
-          message: 'Cannot start game - need exactly 4 players' 
+          message: 'Cannot start game - no players waiting' 
         });
       }
     });
 
     // Handle admin ending the game
     socket.on('adminEndGame', () => {
+      if (!socket.isAdmin) {
+        console.log('Unauthorized attempt to end game');
+        socket.emit('error', { message: 'Unauthorized' });
+        return;
+      }
+
       console.log('Admin end game request received');
       // Find any active game
       for (const [gameId, game] of activeGames.entries()) {
@@ -46,6 +94,7 @@ app.prepare().then(() => {
         game.players.forEach(player => {
           const playerSocket = io.sockets.sockets.get(player.id);
           if (playerSocket) {
+            console.log('Sending gameEnded event to player:', player.id);
             playerSocket.emit('gameEnded', { message: 'Game ended by admin' });
           }
         });
@@ -54,6 +103,14 @@ app.prepare().then(() => {
         activeGames.delete(gameId);
         console.log('Game ended by admin:', gameId);
       }
+
+      // Notify admin that game has ended
+      console.log('Sending gameEnded event to admin');
+      socket.emit('gameEnded');
+      
+      // Broadcast game ended event to all clients
+      console.log('Broadcasting gameEnded event to all clients');
+      io.emit('gameEnded');
     });
 
     // Handle player rejoining game
@@ -163,6 +220,12 @@ app.prepare().then(() => {
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
       
+      // If admin disconnects, clear admin status
+      if (socket.id === adminSocketId) {
+        adminSocketId = null;
+        console.log('Admin disconnected, admin status cleared');
+      }
+      
       // Remove from waiting list if in lobby
       const waitingIndex = waitingPlayers.findIndex(p => p.id === socket.id);
       if (waitingIndex !== -1) {
@@ -246,34 +309,44 @@ app.prepare().then(() => {
         position: newPosition
       });
     });
+
+    // Handle player connection
+    socket.on('playerConnect', (playerName) => {
+      console.log('Player connected:', playerName);
+      
+      // Add to waiting players
+      const player = {
+        id: socket.id,
+        name: playerName,
+        position: 1,
+        diceValue: 0,
+        isActive: true
+      };
+      waitingPlayers.push(player);
+      console.log('Added player to waiting list:', player);
+      io.emit('lobbyUpdate', waitingPlayers);
+    });
   });
 
   // Function to start a new game when admin initiates
   function startNewGame() {
-    if (waitingPlayers.length < 4) return;
+    if (waitingPlayers.length < 1) return;
     
-    // Take the first 4 players from the waiting list
-    const gamePlayers = waitingPlayers.splice(0, 4);
+    // Take all players from the waiting list
+    const gamePlayers = [...waitingPlayers];
+    waitingPlayers.length = 0; // Clear the waiting list
     
     // Create a unique room ID for the game
     const gameId = `game_${Date.now()}`;
     
-    // Add players to the game room
-    gamePlayers.forEach(player => {
-      const socket = io.sockets.sockets.get(player.id);
-      if (socket) {
-        socket.join(gameId);
-      }
-    });
-    
     // Create new game state
     const newGame = {
       id: gameId,
-      players: gamePlayers.map((player, index) => ({
+      players: gamePlayers.map(player => ({
         ...player,
         position: 0,
         hasWon: false,
-        isAdmin: index === 0 // First player is admin
+        isActive: true
       })),
       tasks: generateTasks(),
       startTime: Date.now()
@@ -282,30 +355,54 @@ app.prepare().then(() => {
     // Store game state
     activeGames.set(gameId, newGame);
 
-    // Notify each player about game start with all players' info
+    // Notify all players about game start and redirect them
     gamePlayers.forEach(player => {
       const socket = io.sockets.sockets.get(player.id);
       if (socket) {
         console.log('Starting game for player:', {
           playerId: player.id,
           playerName: player.name,
-          isAdmin: player.isAdmin,
           gameUrl: `/game/${player.id}`
         });
         
+        // Join the game room
+        socket.join(gameId);
+        
+        // Send game start event with player data
         socket.emit('gameStart', {
           gameId,
-          player,
+          player: {
+            ...player,
+            position: 0,
+            hasWon: false,
+            isActive: true
+          },
           players: newGame.players,
           gameUrl: `/game/${player.id}`
         });
       }
     });
-
-    // Notify all clients in lobby that these players have left
-    io.to('lobby').emit('updateLobby', { waitingPlayers });
     
-    console.log(`Game started with players: ${gamePlayers.map(p => p.name).join(', ')}`);
+    // Notify admin that game has started
+    const adminSocket = io.sockets.sockets.get(adminSocketId);
+    if (adminSocket) {
+      console.log('Sending gameStarted event to admin:', adminSocketId);
+      adminSocket.emit('gameStarted', {
+        gameId,
+        players: gamePlayers
+      });
+    } else {
+      console.log('No admin socket found to send gameStarted event');
+    }
+    
+    // Broadcast game started event to all clients
+    console.log('Broadcasting gameStarted event to all clients');
+    io.emit('gameStarted', {
+      gameId,
+      players: gamePlayers
+    });
+    
+    console.log(`Game started with ${gamePlayers.length} players`);
   }
 
   // Function to generate spiritual tasks
@@ -377,7 +474,6 @@ app.prepare().then(() => {
         moveForward: 5,
         moveBackward: 2
       }
-      // Add more tasks as needed
     ];
   }
 
