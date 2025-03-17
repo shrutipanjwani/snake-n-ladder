@@ -9,7 +9,10 @@ interface LobbyScreenProps {
   isJoined: boolean;
 }
 
-const LobbyScreen: React.FC<LobbyScreenProps> = ({ waitingPlayers, isJoined }) => {
+const LobbyScreen: React.FC<LobbyScreenProps> = ({ 
+  waitingPlayers = [], // Provide default empty array
+  isJoined = false 
+}) => {
   const [playerName, setPlayerName] = useState('');
   
   const handleJoinLobby = (e: React.FormEvent) => {
@@ -40,7 +43,6 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ waitingPlayers, isJoined }) =
             />
           </div>
           
-          
           <button
             type="submit"
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -51,9 +53,11 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ waitingPlayers, isJoined }) =
       )}
 
       <div className="mt-6">
-        <h2 className="text-lg font-semibold mb-2">Waiting Players ({waitingPlayers.length}/4):</h2>
+        <h2 className="text-lg font-semibold mb-2">
+          Waiting Players ({(waitingPlayers || []).length}/4):
+        </h2>
         <ul className="space-y-2">
-          {waitingPlayers.map((player) => (
+          {(waitingPlayers || []).map((player) => (
             <li
               key={player.id}
               className="bg-gray-50 p-2 rounded-md flex justify-between items-center"

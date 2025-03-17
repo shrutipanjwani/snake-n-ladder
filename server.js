@@ -23,6 +23,29 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
+    // Handle player rejoining game
+    socket.on('rejoinGame', ({ gameId, player }) => {
+      const game = activeGames.get(gameId);
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      // Update player's socket ID in the game
+      const playerIndex = game.players.findIndex(p => p.name === player.name);
+      if (playerIndex !== -1) {
+        game.players[playerIndex].id = socket.id;
+        socket.join(gameId);
+        
+        // Send current game state back to player
+        socket.emit('gameStart', {
+          gameId,
+          player: game.players[playerIndex],
+          gameUrl: `/game/${socket.id}`
+        });
+      }
+    });
+
     // Player joins lobby
     socket.on('joinLobby', (player) => {
       const newPlayer = {
@@ -53,30 +76,27 @@ app.prepare().then(() => {
     });
 
     // Player scanned QR code
-    socket.on('qrScanned', ({ taskId, answer }) => {
-      // Find which game this player is in
+    socket.on('qrScanned', ({ playerId, taskId, answer }) => {
       let gameId = null;
       let currentGame = null;
       
+      // Find the game this player is in
       for (const [id, game] of activeGames.entries()) {
-        if (game.players.some(player => player.id === socket.id)) {
+        if (game.players.some(p => p.id === playerId)) {
           gameId = id;
           currentGame = game;
           break;
         }
       }
       
-      if (!gameId || !currentGame) {
-        socket.emit('error', { message: 'You are not in an active game' });
-        return;
-      }
+      if (!gameId || !currentGame) return;
       
-      // Find the player
-      const playerIndex = currentGame.players.findIndex(p => p.id === socket.id);
+      const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) return;
+      
       const player = currentGame.players[playerIndex];
-      
-      // Find the task
       const task = currentGame.tasks.find(t => t.id === taskId);
+      
       if (!task) {
         socket.emit('error', { message: 'Invalid task ID' });
         return;
@@ -90,34 +110,25 @@ app.prepare().then(() => {
       const newPosition = Math.max(0, Math.min(50, player.position + moveAmount));
       currentGame.players[playerIndex].position = newPosition;
       
-      // Check if player reached the center (position 50)
-      const hasWon = newPosition >= 50;
+      // Check for win condition
+      if (newPosition >= 50) {
+        currentGame.players[playerIndex].hasWon = true;
+        socket.emit('playerWon', { playerId });
+      }
       
       // Update game state
       activeGames.set(gameId, currentGame);
       
-      // Broadcast updated game state to all players in this game
-      io.to(gameId).emit('gameUpdate', {
-        players: currentGame.players,
-        taskResult: {
-          playerId: player.id,
-          isCorrect,
-          moveAmount,
-          newPosition
-        }
+      // Notify player of task completion and new position
+      socket.emit('taskCompleted', {
+        playerId,
+        success: isCorrect
       });
       
-      // If player won, broadcast game over
-      if (hasWon) {
-        io.to(gameId).emit('gameOver', {
-          winner: player
-        });
-        
-        // Remove game after a delay
-        setTimeout(() => {
-          activeGames.delete(gameId);
-        }, 5000);
-      }
+      socket.emit('gameUpdate', {
+        player: currentGame.players[playerIndex],
+        position: newPosition
+      });
     });
 
     // Player disconnects
@@ -155,6 +166,58 @@ app.prepare().then(() => {
         }
       }
     });
+
+    // Handle dice roll
+    socket.on('rollDice', ({ playerId, roll }) => {
+      let gameId = null;
+      let currentGame = null;
+      
+      // Find the game this player is in
+      for (const [id, game] of activeGames.entries()) {
+        if (game.players.some(p => p.id === playerId)) {
+          gameId = id;
+          currentGame = game;
+          break;
+        }
+      }
+      
+      if (!gameId || !currentGame) return;
+      
+      const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) return;
+      
+      const player = currentGame.players[playerIndex];
+      if (player.hasWon) return; // Don't allow moves if player has won
+      
+      // Calculate new position
+      const newPosition = Math.min(50, player.position + roll);
+      currentGame.players[playerIndex].position = newPosition;
+      
+      // Check if landed on QR code position
+      const qrTaskId = hasQRCode(newPosition);
+      if (qrTaskId) {
+        socket.emit('requireQRScan', {
+          playerId,
+          position: newPosition,
+          taskId: qrTaskId
+        });
+      }
+      
+      // Check for win condition
+      if (newPosition >= 50) {
+        currentGame.players[playerIndex].hasWon = true;
+        socket.emit('playerWon', { playerId });
+      }
+      
+      // Update game state
+      activeGames.set(gameId, currentGame);
+      
+      // Send update only to the player who rolled
+      socket.emit('gameUpdate', {
+        player: currentGame.players[playerIndex],
+        position: newPosition
+      });
+    });
   });
 
   // Function to start a new game when 4 players are ready
@@ -163,11 +226,6 @@ app.prepare().then(() => {
     
     // Take the first 4 players from the waiting list
     const gamePlayers = waitingPlayers.splice(0, 4);
-    
-    // Assign corners (0-3) to each player
-    gamePlayers.forEach((player, index) => {
-      player.corner = index;
-    });
     
     // Create a unique room ID for the game
     const gameId = `game_${Date.now()}`;
@@ -180,21 +238,37 @@ app.prepare().then(() => {
       }
     });
     
-    // Create game with spiritual tasks
+    // Create new game state
     const newGame = {
       id: gameId,
-      players: gamePlayers,
-      tasks: generateTasks(), // Function to generate spiritual tasks
+      players: gamePlayers.map(player => ({
+        ...player,
+        position: 0,
+        hasWon: false
+      })),
+      tasks: generateTasks(),
       startTime: Date.now()
     };
     
     // Store the game
     activeGames.set(gameId, newGame);
     
-    // Notify all players that the game is starting
-    io.to(gameId).emit('gameStart', {
-      gameId,
-      players: gamePlayers
+    // Notify all players that the game is starting with their specific URLs
+    gamePlayers.forEach(player => {
+      const socket = io.sockets.sockets.get(player.id);
+      if (socket) {
+        console.log('Starting game for player:', {
+          playerId: player.id,
+          playerName: player.name,
+          gameUrl: `/game/${player.id}`
+        });
+        
+        socket.emit('gameStart', {
+          gameId,
+          player: player,
+          gameUrl: `/game/${player.id}`
+        });
+      }
     });
     
     console.log(`Game started with players: ${gamePlayers.map(p => p.name).join(', ')}`);

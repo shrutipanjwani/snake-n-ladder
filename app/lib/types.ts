@@ -26,6 +26,7 @@ export interface TaskResult {
 export interface GameState {
   gameId: string | null;
   players: Player[];
+  currentPlayer: Player | null;
   isInLobby: boolean;
   isInGame: boolean;
   isGameOver: boolean;
