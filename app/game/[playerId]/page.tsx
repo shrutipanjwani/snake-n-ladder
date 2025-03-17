@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useGameStore } from '@/app/store/gameStore';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
 
 export default function GamePage() {
   const params = useParams();
-  const router = useRouter();
   const playerId = params.playerId as string;
   const { currentPlayer, gameId, startGame, resetGame } = useGameStore();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -142,37 +141,95 @@ export default function GamePage() {
 
   if (gameEnded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-purple-100 to-indigo-100">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-          <h1 className="text-3xl font-bold text-indigo-600 mb-4">Game Ended</h1>
-          <p className="text-gray-600 mb-6">Thank you for playing Snake & Ladder!</p>
-          <p className="text-gray-600 mb-8">Final Position: {finalPosition}</p>
-          <button
-            onClick={handleCloseTab}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Close Tab
-          </button>
+      <div className="game-container">
+        <div className="card game-ended-card">
+          <div className="card-content text-center">
+            <div className="game-result-icon">🏆</div>
+            <h1 className="game-title">Game Ended</h1>
+            <p className="game-description">Thank you for playing Snake & Ladder!</p>
+            
+            <div className="stat-card" style={{ margin: '2rem auto' }}>
+              <div className="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span className="stat-title">Final Position</span>
+              </div>
+              <div className="stat-value">{finalPosition}</div>
+            </div>
+            
+            <button onClick={handleCloseTab} className="btn btn-primary" style={{ width: '100%' }}>
+              Close Game
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-purple-100 to-indigo-100">
-      <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-        <h1 className="text-3xl font-bold text-indigo-600 mb-4">Snake & Ladder Game</h1>
-        <p className="text-gray-600 mb-4">Player ID: {playerId}</p>
-        <p className="text-gray-600 mb-4">Position: {currentPlayer?.position || 0}</p>
-        {isConnecting && (
-          <p className="text-blue-600 mb-4">Connecting to game server...</p>
-        )}
-        {error && (
-          <p className="text-red-600 mb-4">{error}</p>
-        )}
+    <div className="game-container">
+      <div className="card game-card">
+        <div className="card-header">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 2l-4 5-4-5"></path>
+            <path d="M8.5 14v0"></path>
+            <path d="M12 14v0"></path>
+            <path d="M15.5 14v0"></path>
+          </svg>
+          <h1 className="card-title">Snake & Ladder Game</h1>
+        </div>
         
-        {/* Dice Component */}
-        <Dice onRoll={handleDiceRoll} />
+        <div className="card-content">
+          <div className="game-info">
+            <div className="game-player">
+              <div className="player-details">
+                <h2 className="player-name">{currentPlayer?.name || 'Player'}</h2>
+                <span className="player-id">ID: {playerId.slice(-6)}</span>
+              </div>
+            </div>
+            
+            <div className="game-progress">
+              <div className="progress-label">
+                <span>Position: {currentPlayer?.position || 0}/50</span>
+              
+              </div>
+              
+            </div>
+
+            {isConnecting && (
+              <div className="status-message status-connecting">
+                <div className="spinner-small"></div>
+                <span>Connecting to game server...</span>
+              </div>
+            )}
+            
+            {error && (
+              <div className="status-message status-error">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="dice-container">
+            <Dice onRoll={handleDiceRoll} />
+          </div>
+          
+          <div className="game-instructions">
+            <h3 className="instructions-title">How to Play:</h3>
+            <p>1. Roll the dice to move along the board</p>
+            <p>2. Land on a QR code tile to answer a spiritual question</p>
+            <p>3. Correct answers move you forward, incorrect answers move you back</p>
+            <p>4. First player to reach position 50 (center) wins!</p>
+          </div>
+        </div>
       </div>
     </div>
   );

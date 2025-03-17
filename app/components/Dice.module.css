@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-color: #70c1b3;
+  /* background-color: #70c1b3; */
 }
 
 .container {
@@ -36,7 +36,8 @@
 
 .diceOne {
   position: absolute;
-  left: 150px;
+  left: -50px;
+  bottom: 100px;
 }
 
 .diceTwo {
@@ -146,7 +147,7 @@
 .rollButton button {
   padding: 15px 50px;
   color: #fff;
-  background-color: #f4d35e;
+  background-color: #5e86f4;
   border: none;
   font-size: 20px;
   border-radius: 20px;
