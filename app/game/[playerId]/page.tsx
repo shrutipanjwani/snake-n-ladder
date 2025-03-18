@@ -5,7 +5,26 @@ import { useParams } from 'next/navigation';
 import { useGameStore } from '@/app/store/gameStore';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
-import Leaderboard from '@/app/components/Leaderboard';
+import { getTaskById } from '@/app/store/tasks';
+import QRScanner from '@/app/components/QRScanner';
+
+interface Task {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  moveForward: number;
+  moveBackward: number;
+}
+
+interface GameState {
+  currentPosition: number;
+  requiresQR: boolean;
+  taskId?: string;
+  isAnsweringTask: boolean;
+  currentTask?: Task;
+  message?: string;
+}
 
 export default function GamePage() {
   const params = useParams();
@@ -16,145 +35,215 @@ export default function GamePage() {
   const [finalPosition, setFinalPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [gameState, setGameState] = useState<GameState>({
+    currentPosition: 0,
+    requiresQR: false,
+    isAnsweringTask: false
+  });
+  
   const socketRef = useRef<Socket | null>(null);
   const hasGameEndedRef = useRef(false);
 
   useEffect(() => {
-    if (hasGameEndedRef.current) {
-      console.log('Game has ended, not attempting to reconnect');
-      return;
-    }
+    // Initialize socket connection
+    const newSocket = io('http://localhost:3000', {
+      transports: ['websocket']
+    });
 
-    try {
-      console.log('Attempting to connect to game server...');
-      const socket = io('http://localhost:3000', {
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 3000
-      });
+    newSocket.on('connect', () => {
+      console.log('Connected to game server');
+      setIsConnecting(false);
+      socketRef.current = newSocket;
+    });
 
-      socketRef.current = socket;
-      setSocket(socket);
-      setIsConnecting(true);
-
-      socket.on('connect', () => {
-        console.log('Connected to game server');
-        setIsConnecting(false);
-        setError(null);
-        socket.emit('joinGame', { playerId });
-      });
-
-      socket.on('gameStart', (data) => {
-        console.log('Game started:', data);
-        startGame(data.gameId, data.players);
-      });
-
-      socket.on('gameEnded', (data) => {
-        console.log('Game ended by admin:', data);
-        hasGameEndedRef.current = true;
-        const position = currentPlayer?.position || 0;
-        setFinalPosition(position);
-        setGameEnded(true);
-        resetGame();
-        socket.disconnect();
-        socketRef.current = null;
-        setSocket(null);
-      });
-
-      socket.on('diceRollResult', (data) => {
+    // Handle dice roll results
+    newSocket.on('diceRollResult', (data: {
+      playerId: string;
+      value: number;
+      newPosition: number;
+      message?: string;
+      requiresQR?: boolean;
+      taskId?: string;
+    }) => {
+      if (data.playerId === playerId) {
         console.log('Dice roll result:', data);
-        if (data.newPosition !== undefined && gameId) {
-          const oldPosition = currentPlayer?.position || 0;
-          
-          // Update the game state
-          startGame(gameId, currentPlayer ? [{ 
-            ...currentPlayer, 
-            position: data.newPosition,
-            lastMove: {
-              from: oldPosition,
-              to: data.newPosition,
-              value: data.value
-            }
-          }] : []);
-
-          // Emit the state update to all clients
-          socket.emit('updateGameState', {
-            playerId,
-            gameId,
-            position: data.newPosition,
-            lastMove: {
-              from: oldPosition,
-              to: data.newPosition,
-              value: data.value
-            }
-          });
-
-          if (data.hasWon) {
-            hasGameEndedRef.current = true;
-            setFinalPosition(data.newPosition);
-            setGameEnded(true);
-            resetGame();
-            socket.disconnect();
-            socketRef.current = null;
-            setSocket(null);
-          }
-        }
-      });
-
-      socket.on('error', (data) => {
-        console.error('Server error:', data.message);
-        setError(data.message);
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Disconnected from game server');
-        socketRef.current = null;
-        setSocket(null);
-        setIsConnecting(false);
         
-        if (!hasGameEndedRef.current) {
-          setError('Connection lost. Attempting to reconnect...');
+        // Check if message indicates a QR code
+        const isQRCode = data.message?.includes('Found a QR code at position');
+        
+        // If QR code is found, immediately select a random task
+        if (isQRCode) {
+          const taskIds = ['task1', 'task2', 'task3', 'task4', 'task5'];
+          const randomTaskId = taskIds[Math.floor(Math.random() * taskIds.length)];
+          const task = getTaskById(randomTaskId);
+          
+          setGameState(prev => ({
+            ...prev,
+            currentPosition: data.newPosition,
+            requiresQR: true,
+            taskId: randomTaskId,
+            isAnsweringTask: true,
+            currentTask: task,
+            message: data.message
+          }));
+        } else {
+          // Normal position update
+          setGameState(prev => ({
+            ...prev,
+            currentPosition: data.newPosition,
+            requiresQR: false,
+            message: data.message
+          }));
         }
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-        if (!hasGameEndedRef.current) {
-          setError('Connection error occurred. Attempting to reconnect...');
-          setIsConnecting(false);
-        }
-      });
-
-      return () => {
-        if (socket && !hasGameEndedRef.current) {
-          socket.disconnect();
-          socketRef.current = null;
-          setSocket(null);
-        }
-      };
-    } catch (err) {
-      console.error('Error creating socket connection:', err);
-      if (!hasGameEndedRef.current) {
-        setError('Failed to connect to game server. Please refresh the page.');
-        setIsConnecting(false);
       }
-    }
-  }, [playerId, startGame, resetGame, gameId, currentPlayer]);
+    });
 
-  const handleDiceRoll = (value: number) => {
-    if (socketRef.current?.connected) {
-      console.log('Sending dice roll:', value);
-      socketRef.current.emit('rollDice', {
-        playerId,
-        value
-      });
-    } else {
-      console.error('Socket not connected');
-      if (!hasGameEndedRef.current) {
-        setError('Connection lost. Please refresh the page.');
+    // Handle task completion results
+    newSocket.on('taskCompleted', (data: {
+      playerId: string;
+      success: boolean;
+      newPosition: number;
+      moveForward: number;
+      moveBackward: number;
+    }) => {
+      if (data.playerId === playerId) {
+        console.log('Task completed:', data);
+        
+        // Create detailed message about movement
+        const resultMessage = data.success 
+          ? `✅ Correct answer! Moving forward ${data.moveForward} tiles.`
+          : `❌ Incorrect answer. Moving back ${data.moveBackward} tiles.`;
+        
+        // Update game state with new position and message
+        setGameState(prev => ({
+          ...prev,
+          currentPosition: data.newPosition,
+          requiresQR: false,
+          isAnsweringTask: false,
+          taskId: undefined,
+          currentTask: undefined,
+          message: resultMessage
+        }));
+
+        // Clear the result message after 2 seconds
+        setTimeout(() => {
+          setGameState(prev => ({
+            ...prev,
+            message: undefined
+          }));
+        }, 2000);
+
+        // Emit game state update to sync leaderboard
+        socket?.emit('updateGameState', {
+          playerId,
+          position: data.newPosition,
+          lastMove: {
+            from: gameState.currentPosition,
+            to: data.newPosition,
+            message: resultMessage
+          }
+        });
       }
+    });
+
+    // Handle game end
+    newSocket.on('gameEnded', (data: { winner?: { id: string; name: string } }) => {
+      console.log('Game ended:', data);
+      setGameEnded(true);
+      hasGameEndedRef.current = true;
+      if (data.winner) {
+        setFinalPosition(data.winner.id === playerId ? 1 : 0);
+      }
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      console.log('Cleaning up socket connection');
+      newSocket.disconnect();
+    };
+  }, [playerId]);
+
+  // Handle dice roll
+  const handleRollDice = () => {
+    if (!socket || gameEnded) return;
+    
+    const value = Math.floor(Math.random() * 6) + 1;
+    console.log('Rolling dice:', value);
+    socket.emit('rollDice', { playerId, value });
+  };
+
+  // Handle QR code scan (now used for testing with random tasks)
+  const handleQRScan = () => {};
+
+  // Handle task answer
+  const handleTaskAnswer = (answer: number) => {
+    if (!socket || !gameState.taskId || !gameState.currentTask) return;
+    
+    const task = gameState.currentTask;
+    const isCorrect = answer === task.correctAnswer;
+    
+    console.log('Submitting answer:', {
+      playerId,
+      taskId: gameState.taskId,
+      answer,
+      isCorrect,
+      currentPosition: gameState.currentPosition,
+      moveForward: task.moveForward,
+      moveBackward: task.moveBackward
+    });
+    
+    socket.emit('qrScanned', {
+      playerId,
+      taskId: gameState.taskId,
+      answer,
+      isCorrect,
+      currentPosition: gameState.currentPosition,
+      moveForward: task.moveForward,
+      moveBackward: task.moveBackward
+    });
+  };
+
+  // Render game content based on state
+  const renderGameContent = () => {
+    if (gameState.requiresQR && gameState.currentTask) {
+      return (
+        <div className="task-section p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">Spiritual Question</h2>
+          <p className="text-lg mb-6">{gameState.currentTask.question}</p>
+          <div className="space-y-4">
+            {gameState.currentTask.options.map((option, index) => (
+              <button
+                key={index}
+                onClick={() => handleTaskAnswer(index)}
+                className="w-full p-4 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200 ease-in-out border border-gray-200 relative group"
+              >
+                <span className="block">{option}</span>
+                <span className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  →
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-700">
+              Correct answer moves you forward {gameState.currentTask.moveForward} tiles.
+              <br />
+              Incorrect answer moves you back {gameState.currentTask.moveBackward} tiles.
+            </p>
+          </div>
+        </div>
+      );
     }
+
+    return (
+      <div className="dice-section">
+        <Dice onRoll={handleRollDice} disabled={gameEnded} />
+        {gameState.message && (
+          <p className="mt-4 text-sm text-gray-600 animate-fade-in">{gameState.message}</p>
+        )}
+      </div>
+    );
   };
 
   const handleCloseTab = () => {
@@ -208,52 +297,19 @@ export default function GamePage() {
         </div>
 
         <div className="card-content">
-          <div className="game-info">
-            <div className="game-player">
-              <div className="player-details">
-                <h2 className="player-name">{currentPlayer?.name || 'Player'}</h2>
-                <span className="player-id">ID: {playerId.slice(-6)}</span>
-              </div>
-            </div>
-            
-            <div className="game-progress">
-              <div className="progress-label">
-                <span>Position: {currentPlayer?.position || 0}/50</span>
-              </div>
-            </div>
-
-            {isConnecting && (
-              <div className="status-message status-connecting">
-                <div className="spinner-small"></div>
-                <span>Connecting to game server...</span>
-              </div>
-            )}
-            
-            {error && (
-              <div className="status-message status-error">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-center">
-            <Dice onRoll={handleDiceRoll} />
+          <div className="game-info mb-4">
+            <h2 className="text-xl font-bold">Player</h2>
+            <p className="text-md">ID: {playerId}</p>
+            <p className="text-md font-semibold">Position: {gameState.currentPosition}/50</p>
           </div>
           
-          <div className="game-instructions">
-            <h3 className="instructions-title">How to Play:</h3>
-            <p>1. Roll the dice to move along the board</p>
-            <p>2. Land on a QR code tile to answer a spiritual question</p>
-            <p>3. Correct answers move you forward, incorrect answers move you back</p>
-            <p>4. First player to reach position 50 (center) wins!</p>
-          </div>
-
-         
+          {renderGameContent()}
+          
+          {gameState.message && (
+            <div className="message-container mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-center text-gray-700">{gameState.message}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

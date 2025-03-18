@@ -166,7 +166,7 @@ app.prepare().then(() => {
     });
 
     // Player scanned QR code
-    socket.on('qrScanned', ({ playerId, taskId, answer }) => {
+    socket.on('qrScanned', ({ playerId, taskId, answer, isCorrect, currentPosition, moveForward, moveBackward }) => {
       let gameId = null;
       let currentGame = null;
       
@@ -185,19 +185,12 @@ app.prepare().then(() => {
       if (playerIndex === -1) return;
       
       const player = currentGame.players[playerIndex];
-      const task = currentGame.tasks.find(t => t.id === taskId);
       
-      if (!task) {
-        socket.emit('error', { message: 'Invalid task ID' });
-        return;
-      }
-      
-      // Check answer and update position
-      const isCorrect = task.correctAnswer === answer;
-      const moveAmount = isCorrect ? task.moveForward : -task.moveBackward;
+      // Calculate new position based on answer
+      const moveAmount = isCorrect ? moveForward : moveBackward;
+      const newPosition = Math.max(0, Math.min(50, currentPosition + (isCorrect ? moveForward : -moveBackward)));
       
       // Update player position
-      const newPosition = Math.max(0, Math.min(50, player.position + moveAmount));
       currentGame.players[playerIndex].position = newPosition;
       
       // Check for win condition
@@ -209,15 +202,26 @@ app.prepare().then(() => {
       // Update game state
       activeGames.set(gameId, currentGame);
       
-      // Notify player of task completion and new position
+      // Send task completion result to the player
       socket.emit('taskCompleted', {
         playerId,
-        success: isCorrect
+        success: isCorrect,
+        newPosition,
+        moveForward,
+        moveBackward
       });
       
-      socket.emit('gameUpdate', {
-        player: currentGame.players[playerIndex],
-        position: newPosition
+      // Broadcast the move to all clients
+      io.emit('gameStateUpdate', {
+        playerId,
+        position: newPosition,
+        lastMove: {
+          from: currentPosition,
+          to: newPosition,
+          message: isCorrect 
+            ? `✅ Correct answer! Moving forward ${moveForward} tiles.`
+            : `❌ Incorrect answer. Moving back ${moveBackward} tiles.`
+        }
       });
     });
 

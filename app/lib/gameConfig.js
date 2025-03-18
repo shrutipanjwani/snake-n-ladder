@@ -1,24 +1,5 @@
-// Types for game board elements
-interface QRPosition {
-  position: number;
-  taskId: string;
-}
-
-interface SnakeLadder {
-  start: number;
-  end: number;
-  type: 'snake' | 'ladder';
-}
-
 // Game board configuration
-export interface GameElement {
-  start: number;
-  end: number;
-  type: 'snake' | 'ladder';
-}
-
-// Snake and ladder positions
-export const gameElements: GameElement[] = [
+export const gameElements = [
   // Snakes (move backward)
   { start: 48, end: 26, type: 'snake' },
   { start: 43, end: 17, type: 'snake' },
@@ -35,7 +16,7 @@ export const gameElements: GameElement[] = [
 ];
 
 // QR code positions with associated tasks
-export const qrPositions: QRPosition[] = [
+export const qrPositions = [
   { position: 6, taskId: 'task1' },
   { position: 13, taskId: 'task2' },
   { position: 23, taskId: 'task3' },
@@ -46,21 +27,16 @@ export const qrPositions: QRPosition[] = [
 ];
 
 // Helper functions
-export const getGameElement = (position: number): GameElement | null => {
+export const getGameElement = (position) => {
   return gameElements.find(element => element.start === position) || null;
 };
 
-export const hasQRCode = (position: number): QRPosition | null => {
+export const hasQRCode = (position) => {
   return qrPositions.find(qr => qr.position === position) || null;
 };
 
 // Function to calculate final position after a move
-export const calculateFinalPosition = (currentPosition: number, diceValue: number): {
-  newPosition: number;
-  message: string;
-  requiresQR?: boolean;
-  taskId?: string;
-} => {
+export const calculateFinalPosition = (currentPosition, diceValue) => {
   // First calculate the new position after dice roll
   let newPosition = currentPosition + diceValue;
   let message = '';
