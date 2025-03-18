@@ -5,6 +5,8 @@ export interface Player {
   name: string;
   position: number;
   corner: number; // 0, 1, 2, or 3 - corresponds to the corner they start from
+  hasWon?: boolean;
+  isActive?: boolean;
 }
 
 export interface Task {
@@ -34,6 +36,7 @@ export interface GameState {
   currentTask: Task | null;
   taskResult: TaskResult | null;
   isHydrated: boolean;
+  isGameStarted: boolean;
 }
 
 export interface QRCodeData {

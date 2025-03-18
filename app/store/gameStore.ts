@@ -24,7 +24,8 @@ const initialState: GameState = {
   winner: null,
   currentTask: null,
   taskResult: null,
-  isHydrated: false
+  isHydrated: false,
+  isGameStarted: false
 };
 
 export const useGameStore = create<GameStore>()(
@@ -64,11 +65,13 @@ export const useGameStore = create<GameStore>()(
       },
 
       startGame: (gameId: string, players: Player[]) => {
+        console.log('Starting game in store:', { gameId, players });
         set({ 
           gameId, 
           players, 
           isInGame: true, 
-          isInLobby: false 
+          isInLobby: false,
+          isGameStarted: true
         });
       },
 

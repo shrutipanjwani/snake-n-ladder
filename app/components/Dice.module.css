@@ -3,9 +3,8 @@
   width: auto;
   height: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   min-height: 100vh;
   background-color: #70c1b3;
 }
@@ -13,7 +12,7 @@
 .container {
   position: relative;
   display: inline-block;
-  margin-top: 200px;
+  top: 200px;
 }
 
 .dice {
@@ -34,12 +33,12 @@
   box-shadow: inset 2px 2px #d90429;
 }
 
-.diceOne {
+.dice-one {
   position: absolute;
   left: 150px;
 }
 
-.diceTwo {
+.dice-two {
   position: absolute;
   left: -50px;
 }
@@ -59,8 +58,8 @@
   transform: translateZ(3.1em);
 }
 
-.side:nth-child(6) {
-  transform: rotateY(90deg) translateZ(3.1em);
+.side:nth-child(2) {
+  transform: rotateY(180deg) translateZ(3.1em);
 }
 
 .side:nth-child(3) {
@@ -68,82 +67,83 @@
 }
 
 .side:nth-child(4) {
-  transform: rotateX(90deg) translateZ(3.1em);
-}
-
-.side:nth-child(5) {
   transform: rotateX(-90deg) translateZ(3.1em);
 }
 
-.side:nth-child(2) {
-  transform: rotateY(-180deg) translateZ(3.1em);
+.side:nth-child(5) {
+  transform: rotateX(90deg) translateZ(3.1em);
 }
 
-.show1 {
+.side:nth-child(6) {
+  transform: rotateY(90deg) translateZ(3.1em);
+}
+
+.show-1 {
   transform: rotateX(720deg) rotateZ(-720deg);
 }
 
-.show6 {
-  transform: rotateX(-900deg) rotateZ(1080deg);
+.show-2 {
+  transform: rotateY(180deg) rotateZ(-720deg);
 }
 
-.show3 {
-  transform: rotateY(-450deg) rotateZ(-1440deg);
+.show-3 {
+  transform: rotateY(90deg) rotateZ(1080deg);
 }
 
-.show4 {
-  transform: rotateY(810deg) rotateZ(720deg);
+.show-4 {
+  transform: rotateX(90deg) rotateZ(-1080deg);
 }
 
-.show5 {
-  transform: rotateX(-810deg) rotateZ(-1080deg);
+.show-5 {
+  transform: rotateX(-90deg) rotateZ(720deg);
 }
 
-.show2 {
-  transform: rotateX(450deg) rotateZ(-720deg);
+.show-6 {
+  transform: rotateY(-90deg) rotateZ(-1440deg);
 }
 
-.two1, .three1, .four1, .five1, .six1 {
+.two-1, .three-1, .four-1, .five-1, .six-1 {
   top: 20%;
   left: 20%;
 }
 
-.four3, .five3, .six4 {
+.four-3, .five-3, .six-4 {
   top: 20%;
   left: 80%;
 }
 
-.one1, .three2, .five5 {
+.one-1, .three-2, .five-5 {
   top: 50%;
   left: 50%;
 }
 
-.four2, .five2, .six3 {
+.four-2, .five-2, .six-3 {
   top: 80%;
   left: 20%;
 }
 
-.two2, .three3, .four4, .five4, .six6 {
+.two-2, .three-3, .four-4, .five-4, .six-6 {
   top: 80%;
   left: 80%;
 }
 
-.six2 {
+.six-2 {
   top: 50%;
   left: 20%;
 }
 
-.six5 {
+.six-5 {
   top: 50%;
   left: 80%;
 }
 
-.rollButton {
+.roll-button {
   position: relative;
-  margin-top: 80px;
+  top: 80px;
+  left: 10px;
 }
 
-.rollButton button {
+.roll-button button {
   padding: 15px 50px;
   color: #fff;
   background-color: #f4d35e;
@@ -153,17 +153,17 @@
   box-shadow: 1px 3px #50514F;
   outline: none;
   transition: .3s;
-  cursor: pointer;
 }
 
-.rollButton button:hover,
-.rollButton button:active {
+.roll-button button:hover,
+.roll-button button:active {
   outline: none;
   background: #50514F;
+  cursor: pointer;
   transform: translateY(15px);
 }
 
-.rollButton button:disabled {
+.roll-button button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
