@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useGameStore } from '@/app/store/gameStore';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
+import Leaderboard from '@/app/components/Leaderboard';
 
 export default function GamePage() {
   const params = useParams();
@@ -64,7 +65,31 @@ export default function GamePage() {
       socket.on('diceRollResult', (data) => {
         console.log('Dice roll result:', data);
         if (data.newPosition !== undefined && gameId) {
-          startGame(gameId, currentPlayer ? [{ ...currentPlayer, position: data.newPosition }] : []);
+          const oldPosition = currentPlayer?.position || 0;
+          
+          // Update the game state
+          startGame(gameId, currentPlayer ? [{ 
+            ...currentPlayer, 
+            position: data.newPosition,
+            lastMove: {
+              from: oldPosition,
+              to: data.newPosition,
+              value: data.value
+            }
+          }] : []);
+
+          // Emit the state update to all clients
+          socket.emit('updateGameState', {
+            playerId,
+            gameId,
+            position: data.newPosition,
+            lastMove: {
+              from: oldPosition,
+              to: data.newPosition,
+              value: data.value
+            }
+          });
+
           if (data.hasWon) {
             hasGameEndedRef.current = true;
             setFinalPosition(data.newPosition);
@@ -182,6 +207,7 @@ export default function GamePage() {
           <h1 className="card-title">Snake & Ladder Game</h1>
         </div>
         
+
         <div className="card-content">
           <div className="game-info">
             <div className="game-player">
@@ -229,6 +255,10 @@ export default function GamePage() {
             <p>3. Correct answers move you forward, incorrect answers move you back</p>
             <p>4. First player to reach position 50 (center) wins!</p>
           </div>
+
+        <div className="flex justify-center">
+          <Dice onRoll={handleDiceRoll} />
+
         </div>
       </div>
     </div>

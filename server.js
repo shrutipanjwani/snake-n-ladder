@@ -220,6 +220,13 @@ app.prepare().then(() => {
       });
     });
 
+    // Handle game state updates
+    socket.on('updateGameState', (data) => {
+      console.log('Game state update received:', data);
+      // Broadcast the update to all clients except the sender
+      socket.broadcast.emit('gameStateUpdate', data);
+    });
+
     // Player disconnects
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
@@ -298,6 +305,7 @@ app.prepare().then(() => {
       }
       
       // Calculate new position
+      const oldPosition = player.position;
       const newPosition = Math.min(50, player.position + value);
       currentGame.players[playerIndex].position = newPosition;
       
@@ -317,12 +325,23 @@ app.prepare().then(() => {
         hasWon: currentGame.players[playerIndex].hasWon
       });
       
-      // Send the result back to the same socket that sent the roll
-      socket.emit('diceRollResult', {
+      const moveData = {
+        playerId,
         value,
         newPosition,
-        hasWon: currentGame.players[playerIndex].hasWon
-      });
+        hasWon: currentGame.players[playerIndex].hasWon,
+        lastMove: {
+          from: oldPosition,
+          to: newPosition,
+          value: value
+        }
+      };
+
+      // Send the result back to the same socket that sent the roll
+      socket.emit('diceRollResult', moveData);
+      
+      // Broadcast the move to all other clients
+      socket.broadcast.emit('diceRollResult', moveData);
     });
 
     // Handle player connection
