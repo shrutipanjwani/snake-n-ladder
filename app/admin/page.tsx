@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
 import { Player } from '../lib/types';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -116,11 +119,13 @@ export default function AdminPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-md w-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <div className="text-xl font-semibold">Loading...</div>
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-header">
+            <h2 className="login-title">Loading</h2>
+          </div>
+          <div className="spinner-container">
+            <div className="spinner"></div>
           </div>
         </div>
       </div>
@@ -142,118 +147,162 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-md w-96">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold mb-2">Admin Login</h1>
-            <p className="text-sm text-gray-500">Use "123" for both username and password</p>
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-header">
+            <h2 className="login-title">Admin Login</h2>
+            <p className="login-subtitle">Enter your credentials to access the admin panel</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Username</label>
+          <form onSubmit={handleLogin} className="login-form">
+            <div className="form-group">
+              <label className="form-label" htmlFor="username">Username</label>
               <input
+                id="username"
                 type="text"
+                className="form-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                placeholder="Username"
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
+            <div className="form-group">
+              <label className="form-label" htmlFor="password">Password</label>
               <input
+                id="password"
                 type="password"
+                className="form-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                placeholder="Password"
                 required
               />
             </div>
-            {error && <div className="text-red-600 text-sm">{error}</div>}
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+            {error && <p className="error-message">{error}</p>}
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
               Login
             </button>
           </form>
+          <div className="login-footer">
+            <p>Use "123" for both username and password</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-md overflow-hidden p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Admin Panel</h1>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-green-600">Connected as Admin</div>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Logout
-              </button>
+    <div className="admin-container">
+      <div className="admin-wrapper">
+        <div className="admin-header">
+          <h1 className="admin-title">Snake n Ladder Admin Panel</h1>
+          <button onClick={handleLogout} className="btn btn-outline">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </div>
+        
+        <div className="stats-grid">
+          {/* Game ID Card */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="9" x2="20" y2="9"></line>
+                <line x1="4" y1="15" x2="20" y2="15"></line>
+                <line x1="10" y1="3" x2="8" y2="21"></line>
+                <line x1="16" y1="3" x2="14" y2="21"></line>
+              </svg>
+              <span className="stat-title">Game ID</span>
+            </div>
+            <div className="stat-value">
+              {gameStore.gameId ? `${gameStore.gameId.slice(-6)}` : 'No Active Game'}
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">Game Status</h2>
-              <div className="space-y-2">
-                <p>Game ID: {gameStore.gameId || 'No active game'}</p>
-                <p>Players in game: {gameStore.players.length}</p>
-                <p>Game in progress: {gameStore.isInGame ? 'Yes' : 'No'}</p>
-              </div>
+          {/* Players Count Card */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span className="stat-title">Players in Game</span>
             </div>
+            <div className="stat-value">{gameStore.players.length}</div>
+          </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">Waiting Players ({waitingPlayers.length})</h2>
-              <div className="space-y-2">
+          {/* Game Status Card */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span className="stat-title">Game Status</span>
+            </div>
+            <div>
+              <span className={gameStore.isInGame ? "badge badge-success" : "badge badge-neutral"}>
+                {gameStore.isInGame ? 'In Progress' : 'Not Started'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Waiting Players */}
+        <div className="card">
+          <div className="card-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h2 className="card-title">Waiting Players ({waitingPlayers.length})</h2>
+          </div>
+          <div className="card-content">
+            {waitingPlayers.length > 0 ? (
+              <div className="player-list">
                 {waitingPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex justify-between items-center bg-white p-3 rounded shadow"
-                  >
-                    <span>{player.name}</span>
-                    <span>ID: #{player.id.slice(-4)}</span>
+                  <div key={player.id} className="player-item">
+                    <span className="player-name">{player.name}</span>
+                    <span className="player-id">ID: #{player.id.slice(-4)}</span>
                   </div>
                 ))}
-                {waitingPlayers.length === 0 && (
-                  <div className="text-gray-500 text-center py-4">
-                    No players waiting
-                  </div>
-                )}
               </div>
-            </div>
-
-            <div className="flex space-x-4">
-              <button
-                onClick={handleStartGame}
-                disabled={waitingPlayers.length === 0}
-                className={`px-4 py-2 rounded-md text-white ${
-                  waitingPlayers.length > 0
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-gray-400 cursor-not-allowed'
-                }`}
-              >
-                Start Game
-              </button>
-              
-              <button
-                onClick={handleEndGame}
-                disabled={!gameStore.isInGame}
-                className={`px-4 py-2 rounded-md text-white ${
-                  gameStore.isInGame
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-gray-400 cursor-not-allowed'
-                }`}
-              >
-                End Game
-              </button>
-            </div>
+            ) : (
+              <div className="no-players">
+                No players waiting
+              </div>
+            )}
+          </div>
+          <div className="card-footer">
+            <button
+              onClick={handleStartGame}
+              disabled={waitingPlayers.length === 0}
+              className="btn btn-secondary"
+              style={{ opacity: waitingPlayers.length === 0 ? 0.5 : 1 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="10 8 16 12 10 16 10 8"></polygon>
+              </svg>
+              Start Game
+            </button>
+            
+            <button
+              onClick={handleEndGame}
+              disabled={!gameStore.isInGame}
+              className="btn btn-danger"
+              style={{ opacity: !gameStore.isInGame ? 0.5 : 1 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <rect x="9" y="9" width="6" height="6"></rect>
+              </svg>
+              End Game
+            </button>
           </div>
         </div>
       </div>
