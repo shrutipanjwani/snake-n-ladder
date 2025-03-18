@@ -29,6 +29,11 @@ interface GameState {
   isTaskResult?: boolean;
   playerId?: string;
   position?: number;
+  winner?: {
+    id: string;
+    name: string;
+    position: number;
+  };
 }
 
 export default function LeaderboardPage() {
@@ -44,6 +49,29 @@ export default function LeaderboardPage() {
 
     socket.on('connect', () => {
       console.log('Connected to leaderboard');
+      
+      // Load saved state first
+      const savedState = localStorage.getItem('leaderboardState');
+      const savedMoves = localStorage.getItem('movesHistory');
+      const savedProcessedMoves = localStorage.getItem('processedMoves');
+      
+      let hasExistingState = false;
+      
+      if (savedState && savedMoves && savedProcessedMoves) {
+        const parsedState = JSON.parse(savedState);
+        const parsedMoves = JSON.parse(savedMoves);
+        const parsedProcessedMoves = JSON.parse(savedProcessedMoves);
+        
+        if (parsedState.players?.length > 0 && Object.keys(parsedMoves).length > 0) {
+          setGameState(parsedState);
+          setMovesHistory(parsedMoves);
+          processedMoves.current = new Set(parsedProcessedMoves);
+          hasExistingState = true;
+        }
+      }
+      
+      // Request current game state and merge with saved state
+      socket.emit('requestGameState', { hasExistingState });
     });
 
     socket.on('gameStateUpdate', (data: GameState) => {
@@ -64,14 +92,18 @@ export default function LeaderboardPage() {
         processedMoves.current.add(moveId);
 
         // Update game state with new position
-        setGameState(prevState => ({
-          ...prevState,
-          players: prevState.players.map(player =>
-            player.id === data.playerId
-              ? { ...player, position: data.lastMove?.to || player.position }
-              : player
-          )
-        }));
+        setGameState(prevState => {
+          const newState = {
+            ...prevState,
+            players: prevState.players.map(player =>
+              player.id === data.playerId
+                ? { ...player, position: data.lastMove?.to || player.position }
+                : player
+            )
+          };
+          localStorage.setItem('leaderboardState', JSON.stringify(newState));
+          return newState;
+        });
 
         // Add task result as a new move in history
         setMovesHistory(prev => {
@@ -87,17 +119,28 @@ export default function LeaderboardPage() {
             moveId
           };
           
-          return {
+          const newHistory = {
             ...prev,
             [data.playerId as string]: [...playerMoves, newMove]
           };
+          
+          localStorage.setItem('movesHistory', JSON.stringify(newHistory));
+          localStorage.setItem('processedMoves', JSON.stringify(Array.from(processedMoves.current)));
+          
+          return newHistory;
         });
       } else {
         // Handle non-task updates (like initial game state)
-        setGameState(prevState => ({
-          ...prevState,
-          players: data.players || prevState.players
-        }));
+        setGameState(prevState => {
+          const newState = {
+            ...prevState,
+            players: data.players || prevState.players
+          };
+          if (newState.players.length > 0) {
+            localStorage.setItem('leaderboardState', JSON.stringify(newState));
+          }
+          return newState;
+        });
       }
     });
 
@@ -131,22 +174,32 @@ export default function LeaderboardPage() {
           moveId
         };
 
-        // Return updated history
-        return {
+        // Update history
+        const newHistory = {
           ...prev,
           [data.playerId]: [...playerMoves, newMove]
         };
+        
+        // Save to localStorage
+        localStorage.setItem('movesHistory', JSON.stringify(newHistory));
+        localStorage.setItem('processedMoves', JSON.stringify(Array.from(processedMoves.current)));
+        
+        return newHistory;
       });
 
       // Update game state
-      setGameState(prevState => ({
-        ...prevState,
-        players: prevState.players.map(player =>
-          player.id === data.playerId
-            ? { ...player, position: data.newPosition }
-            : player
-        )
-      }));
+      setGameState(prevState => {
+        const newState = {
+          ...prevState,
+          players: prevState.players.map(player =>
+            player.id === data.playerId
+              ? { ...player, position: data.newPosition }
+              : player
+          )
+        };
+        localStorage.setItem('leaderboardState', JSON.stringify(newState));
+        return newState;
+      });
     });
 
     socket.on('gameStarted', (data) => {
@@ -166,6 +219,58 @@ export default function LeaderboardPage() {
         processedMoves.current.clear();
         setMovesHistory(initialMovesHistory);
         setGameState({ players: initialPlayers });
+        
+        // Clear localStorage
+        localStorage.removeItem('leaderboardState');
+        localStorage.removeItem('movesHistory');
+        localStorage.removeItem('processedMoves');
+      }
+    });
+
+    socket.on('playerWon', (data: { playerId: string, winnerName: string, finalPosition: number }) => {
+      console.log('🏆 Player won:', data);
+      // Update game state with winner information
+      setGameState(prev => ({
+        ...prev,
+        winner: {
+          id: data.playerId,
+          name: data.winnerName,
+          position: data.finalPosition
+        },
+        // Also update the player's position in the players array
+        players: prev.players.map(player =>
+          player.id === data.playerId
+            ? { ...player, position: data.finalPosition }
+            : player
+        )
+      }));
+
+      // Save the updated state to localStorage
+      localStorage.setItem('leaderboardState', JSON.stringify({
+        ...gameState,
+        winner: {
+          id: data.playerId,
+          name: data.winnerName,
+          position: data.finalPosition
+        }
+      }));
+    });
+
+    // Add handler for receiving current game state
+    socket.on('currentGameState', (data: { gameState: GameState, movesHistory: {[playerId: string]: Move[]}, processedMoves: string[] }) => {
+      console.log('Received current game state:', data);
+      if (data.gameState) {
+        setGameState(data.gameState);
+        // Also save to localStorage immediately
+        localStorage.setItem('leaderboardState', JSON.stringify(data.gameState));
+      }
+      if (data.movesHistory) {
+        setMovesHistory(data.movesHistory);
+        localStorage.setItem('movesHistory', JSON.stringify(data.movesHistory));
+      }
+      if (data.processedMoves) {
+        processedMoves.current = new Set(data.processedMoves);
+        localStorage.setItem('processedMoves', JSON.stringify(Array.from(data.processedMoves)));
       }
     });
 
@@ -177,25 +282,79 @@ export default function LeaderboardPage() {
     };
   }, []);
 
+  // Load initial state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem('leaderboardState');
+    const savedMoves = localStorage.getItem('movesHistory');
+    const savedProcessedMoves = localStorage.getItem('processedMoves');
+    
+    if (savedState) {
+      const parsedState = JSON.parse(savedState);
+      setGameState(parsedState);
+    }
+    if (savedMoves) {
+      setMovesHistory(JSON.parse(savedMoves));
+    }
+    if (savedProcessedMoves) {
+      processedMoves.current = new Set(JSON.parse(savedProcessedMoves));
+    }
+  }, []);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    if (gameState.players.length > 0) {
+      localStorage.setItem('leaderboardState', JSON.stringify(gameState));
+    }
+  }, [gameState]);
+
+  useEffect(() => {
+    localStorage.setItem('movesHistory', JSON.stringify(movesHistory));
+  }, [movesHistory]);
+
+  useEffect(() => {
+    localStorage.setItem('processedMoves', JSON.stringify(Array.from(processedMoves.current)));
+  }, [processedMoves.current]);
+
+  // Add game ended listener
+  useEffect(() => {
+    const handleGameEnd = () => {
+      localStorage.removeItem('leaderboardState');
+      localStorage.removeItem('movesHistory');
+      localStorage.removeItem('processedMoves');
+      setGameState({ players: [] });
+      setMovesHistory({});
+      processedMoves.current.clear();
+    };
+
+    socket?.on('gameEnded', handleGameEnd);
+
+    return () => {
+      socket?.off('gameEnded', handleGameEnd);
+    };
+  }, [socket]);
+
+  // Modify the initial loading check
+  const savedState = typeof window !== 'undefined' ? localStorage.getItem('leaderboardState') : null;
+  const hasGameState = gameState.players.length > 0 || (savedState && JSON.parse(savedState).players?.length > 0);
+
   // Safely calculate max moves
   const maxMoves = Math.max(...Object.values(movesHistory).map(moves => moves?.length ?? 0), 0);
 
   // Create array of move indices
   const moveIndices = Array.from({ length: maxMoves }, (_, i) => i);
 
-  // Safe check for players array
-  if (!gameState?.players?.length) {
+  if (!hasGameState) {
     return (
       <div className="leaderboard-container">
-      <div className="leaderboard-content">
-        <h1 className="leaderboard-title">
-         The game of Life
-        </h1>
-        <div className="loading-state">
-          <p className="loading-text">Waiting for game to start</p>
+        <div className="leaderboard-content">
+          <h1 className="leaderboard-title">
+            The Game of Life
+          </h1>
+          <div className="loading-state">
+            <p className="loading-text">Waiting for game to start</p>
+          </div>
         </div>
       </div>
-    </div>
     );
   }
 
@@ -203,8 +362,23 @@ export default function LeaderboardPage() {
     <div className="leaderboard-container">
       <div className="leaderboard-content">
         <h1 className="leaderboard-title">
-          The game of life
+          The Game of Life
         </h1>
+
+        {/* Check for winner based on position or winner state */}
+        {(gameState.winner || gameState.players.some(p => p.position >= 50)) && (
+          <div className="bg-green-100 rounded-lg p-6 mb-6 border-2 border-green-500">
+            <h2 className="text-3xl font-bold text-green-800 mb-4 flex items-center justify-center">
+              🎉 Game Over! 🎉
+            </h2>
+            <p className="text-xl text-green-700 text-center mb-2">
+              {gameState.winner?.name || gameState.players.find(p => p.position >= 50)?.name} has won the game!
+            </p>
+            <p className="text-green-600 text-center">
+              Final Position: {gameState.winner?.position || 50}/50
+            </p>
+          </div>
+        )}
 
         <div className="leaderboard-card">
           <div className="overflow-x-auto">

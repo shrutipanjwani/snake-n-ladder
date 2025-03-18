@@ -17,11 +17,16 @@ interface Task {
 
 interface GameState {
   currentPosition: number;
-  requiresQR: boolean;
-  taskId?: string;
-  isAnsweringTask: boolean;
-  currentTask?: Task;
+  diceValue: number | null;
   message?: string;
+  currentTask: Task | null;
+  taskId: string | null;
+  isGameWon: boolean;
+  winner: {
+    winnerId: string;
+    winnerName: string;
+    finalPosition: number;
+  } | null;
 }
 
 export default function GamePage() {
@@ -33,8 +38,12 @@ export default function GamePage() {
   const [isConnecting, setIsConnecting] = useState(true);
   const [gameState, setGameState] = useState<GameState>({
     currentPosition: 0,
-    requiresQR: false,
-    isAnsweringTask: false
+    diceValue: null,
+    message: '',
+    currentTask: null,
+    taskId: null,
+    isGameWon: false,
+    winner: null
   });
   
   const socketRef = useRef<Socket | null>(null);
@@ -58,36 +67,41 @@ export default function GamePage() {
       value: number;
       newPosition: number;
       message?: string;
-      requiresQR?: boolean;
-      taskId?: string;
+      task?: {
+        taskId: string;
+        question: string;
+        options: string[];
+        moveForward: number;
+        moveBackward: number;
+      } | null;
     }) => {
       if (data.playerId === playerId) {
         console.log('Dice roll result:', data);
         
-        // Check if message indicates a QR code
-        const isQRCode = data.message?.includes('Found a QR code at position');
-        
-        // If QR code is found, immediately select a random task
-        if (isQRCode) {
-          const taskIds = ['task1', 'task2', 'task3', 'task4', 'task5'];
-          const randomTaskId = taskIds[Math.floor(Math.random() * taskIds.length)];
-          const task = getTaskById(randomTaskId);
-          
+        // If we received a task, show it immediately
+        if (data.task && data.task.taskId) {
+          const { taskId, question, options, moveForward, moveBackward } = data.task;
           setGameState(prev => ({
             ...prev,
             currentPosition: data.newPosition,
-            requiresQR: true,
-            taskId: randomTaskId,
-            isAnsweringTask: true,
-            currentTask: task,
-            message: data.message
+            currentTask: {
+              id: taskId,
+              question,
+              options,
+              moveForward,
+              moveBackward,
+              correctAnswer: 0 // This will be checked server-side
+            },
+            taskId,
+            message: undefined // Don't show any message when showing task
           }));
         } else {
-          // Normal position update
+          // Normal position update without task
           setGameState(prev => ({
             ...prev,
             currentPosition: data.newPosition,
-            requiresQR: false,
+            currentTask: null,
+            taskId: null,
             message: data.message
           }));
         }
@@ -114,10 +128,8 @@ export default function GamePage() {
         setGameState(prev => ({
           ...prev,
           currentPosition: data.newPosition,
-          requiresQR: false,
-          isAnsweringTask: false,
-          taskId: undefined,
-          currentTask: undefined,
+          currentTask: null,
+          taskId: null,
           message: resultMessage
         }));
 
@@ -143,13 +155,66 @@ export default function GamePage() {
     });
 
     // Handle game end
-    newSocket.on('gameEnded', (data: { winner?: { id: string; name: string } }) => {
+    newSocket.on('gameEnded', (data: { winner?: { id: string; name: string }, adminEnded?: boolean }) => {
       console.log('Game ended:', data);
-      setGameEnded(true);
-      hasGameEndedRef.current = true;
-      if (data.winner) {
-        setFinalPosition(data.winner.id === playerId ? 1 : 0);
+      
+      // Only end the game if it was ended by admin
+      if (data.adminEnded) {
+        setGameEnded(true);
+        hasGameEndedRef.current = true;
+        
+        // Clear local storage only when admin ends the game
+        localStorage.removeItem(`gameState_${playerId}`);
+        
+        // Update game state to show winner
+        const winner = data?.winner;
+        if (winner?.id && winner?.name) {
+          const isCurrentPlayer = winner.id === playerId;
+          setGameState(prev => ({
+            ...prev,
+            isGameWon: true,
+            diceValue: null,
+            currentTask: null,
+            winner: {
+              winnerId: winner.id,
+              winnerName: isCurrentPlayer ? 'You' : winner.name,
+              finalPosition: prev.currentPosition
+            }
+          }));
+          setFinalPosition(isCurrentPlayer ? 1 : 0);
+        }
       }
+    });
+
+    // Listen for player won event
+    newSocket.on('playerWon', (data: { playerId: string, winnerName: string, finalPosition: number }) => {
+      console.log('🏆 Player won:', data);
+      const isCurrentPlayer = data.playerId === playerId;
+      
+      // Update game state to show winner but don't end the game
+      setGameState(prev => ({
+        ...prev,
+        isGameWon: true,
+        diceValue: null,
+        currentTask: null,
+        winner: {
+          winnerId: data.playerId,
+          winnerName: isCurrentPlayer ? 'You' : data.winnerName,
+          finalPosition: data.finalPosition
+        }
+      }));
+
+      // Save state to localStorage
+      const newState = {
+        ...gameState,
+        isGameWon: true,
+        winner: {
+          winnerId: data.playerId,
+          winnerName: isCurrentPlayer ? 'You' : data.winnerName,
+          finalPosition: data.finalPosition
+        }
+      };
+      localStorage.setItem(`gameState_${playerId}`, JSON.stringify(newState));
     });
 
     setSocket(newSocket);
@@ -157,6 +222,33 @@ export default function GamePage() {
     return () => {
       console.log('Cleaning up socket connection');
       newSocket.disconnect();
+    };
+  }, [playerId]);
+
+  // Load initial state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem(`gameState_${playerId}`);
+    if (savedState) {
+      setGameState(JSON.parse(savedState));
+    }
+  }, [playerId]);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(`gameState_${playerId}`, JSON.stringify(gameState));
+  }, [gameState, playerId]);
+
+  // Clear localStorage when game ends
+  useEffect(() => {
+    if (gameState.isGameWon) {
+      localStorage.removeItem(`gameState_${playerId}`);
+    }
+  }, [gameState.isGameWon, playerId]);
+
+  // Clear localStorage when component unmounts
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem(`gameState_${playerId}`);
     };
   }, [playerId]);
 
@@ -168,54 +260,64 @@ export default function GamePage() {
     console.log('Rolling dice:', value);
     socket.emit('rollDice', { playerId, value });
   };
-
-  // Handle QR code scan (now used for testing with random tasks)
-  const handleQRScan = () => {};
-
   // Handle task answer
   const handleTaskAnswer = (answer: number) => {
-    if (!socket || !gameState.taskId || !gameState.currentTask) return;
+    if (!socket || !gameState.currentTask) return;
     
     const task = gameState.currentTask;
-    const isCorrect = answer === task.correctAnswer;
     
     console.log('Submitting answer:', {
       playerId,
-      taskId: gameState.taskId,
+      taskId: task.id,
       answer,
-      isCorrect,
-      currentPosition: gameState.currentPosition,
-      moveForward: task.moveForward,
-      moveBackward: task.moveBackward
+      currentPosition: gameState.currentPosition
     });
     
-    socket.emit('qrScanned', {
+    // Emit task completion event
+    socket.emit('taskCompleted', {
       playerId,
-      taskId: gameState.taskId,
+      taskId: task.id,
       answer,
-      isCorrect,
-      currentPosition: gameState.currentPosition,
-      moveForward: task.moveForward,
-      moveBackward: task.moveBackward
+      isCorrect: answer === task.correctAnswer
     });
   };
 
   // Render game content based on state
   const renderGameContent = () => {
-    if (gameState.requiresQR && gameState.currentTask) {
+    if (gameState.isGameWon) {
+      return (
+        <div className="text-center py-8">
+          <div className="bg-green-100 rounded-lg p-6 mb-6">
+            <h2 className="text-3xl font-bold text-green-800 mb-4">
+              🎉 Game Over! 🎉
+            </h2>
+            <p className="text-xl text-green-700 mb-2">
+              {gameState.winner?.winnerId === playerId 
+                ? "Congratulations! You've won the game!" 
+                : `${gameState.winner?.winnerName} has won the game!`}
+            </p>
+            <p className="text-green-600">
+              Final Position: {gameState.winner?.finalPosition}/50
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (gameState.currentTask) {
       return (
         <div className="task-section p-6 bg-white rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold mb-4">Question</h2>
+          <h2 className="text-2xl font-bold mb-4 text-indigo-800">Answer the Spiritual Question</h2>
           <p className="text-lg mb-6">{gameState.currentTask.question}</p>
           <div className="space-y-4 flex flex-col gap-4">
             {gameState.currentTask.options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleTaskAnswer(index)}
-                className="w-full p-4 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200 ease-in-out border border-gray-200 relative group"
+                className="w-full p-4 text-left bg-gray-50 hover:bg-indigo-50 rounded-lg transition-colors duration-200 ease-in-out border border-gray-200 hover:border-indigo-300 relative group"
               >
                 <span className="block">{option}</span>
-                <span className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600">
                   →
                 </span>
               </button>
@@ -256,7 +358,7 @@ export default function GamePage() {
           <div className="card-content text-center">
             <div className="game-result-icon">🏆</div>
             <h1 className="game-title">Game Ended</h1>
-            <p className="game-description">Thank you for playing the game of Life!</p>
+            <p className="game-description">Thank you for playing The Game of Life!</p>
             
             <div className="stat-card" style={{ margin: '2rem auto' }}>
               <div className="stat-header">
@@ -289,7 +391,7 @@ export default function GamePage() {
             <path d="M12 14v0"></path>
             <path d="M15.5 14v0"></path>
           </svg>
-          <h1 className="card-title">The game of Life</h1>
+          <h1 className="card-title">The Game of Life</h1>
         </div>
 
         <div className="card-content">
