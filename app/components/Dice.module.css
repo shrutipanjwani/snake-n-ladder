@@ -35,8 +35,8 @@
 
 .dice-one {
   position: absolute;
-  left: -50px;
-  bottom: 100px;
+  left: 50px;
+  bottom: 300px;
 }
 
 .dice-two {

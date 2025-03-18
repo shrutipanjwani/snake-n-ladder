@@ -206,7 +206,6 @@ export default function GamePage() {
           </svg>
           <h1 className="card-title">Snake & Ladder Game</h1>
         </div>
-        
 
         <div className="card-content">
           <div className="game-info">
@@ -220,9 +219,7 @@ export default function GamePage() {
             <div className="game-progress">
               <div className="progress-label">
                 <span>Position: {currentPlayer?.position || 0}/50</span>
-              
               </div>
-              
             </div>
 
             {isConnecting && (
@@ -243,8 +240,8 @@ export default function GamePage() {
               </div>
             )}
           </div>
-          
-          <div className="dice-container">
+
+          <div className="flex justify-center">
             <Dice onRoll={handleDiceRoll} />
           </div>
           
@@ -256,9 +253,7 @@ export default function GamePage() {
             <p>4. First player to reach position 50 (center) wins!</p>
           </div>
 
-        <div className="flex justify-center">
-          <Dice onRoll={handleDiceRoll} />
-
+         
         </div>
       </div>
     </div>
