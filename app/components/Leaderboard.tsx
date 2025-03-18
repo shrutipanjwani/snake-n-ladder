@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useGameStore } from '@/app/store/gameStore';
 import { io } from 'socket.io-client';
+import { Player, TaskResult } from '../lib/types';
 
 interface MoveHistory {
   playerId: string;
@@ -19,12 +20,6 @@ interface MoveHistory {
   isTaskResult?: boolean;
 }
 
-interface Player {
-  id: string;
-  name: string;
-  position: number;
-}
-
 interface GameStateUpdate {
   playerId: string;
   position: number;
@@ -36,8 +31,13 @@ interface GameStateUpdate {
   isTaskResult?: boolean;
 }
 
-export default function Leaderboard() {
-  const { players, updatePlayerPosition } = useGameStore();
+interface LeaderboardProps {
+  players: Player[];
+  taskResult: TaskResult | null;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
+  const { updatePlayerPosition } = useGameStore();
   const [moveHistory, setMoveHistory] = useState<MoveHistory[]>([]);
   const [socket, setSocket] = useState<any>(null);
   const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
@@ -204,3 +204,5 @@ export default function Leaderboard() {
     </div>
   );
 }
+
+export default Leaderboard;

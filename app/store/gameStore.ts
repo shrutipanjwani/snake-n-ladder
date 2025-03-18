@@ -13,6 +13,8 @@ interface GameStore extends GameState {
   startGame: (gameId: string, players: Player[]) => void;
   setCurrentTask: (task: Task | null) => void;
   updatePlayerPosition: (playerId: string, newPosition: number) => void;
+  updateGameState: (players: Player[], taskResult: TaskResult | null) => void;
+  endGame: (winner: Player) => void;
 }
 
 const initialState: GameState = {
@@ -88,6 +90,14 @@ export const useGameStore = create<GameStore>()(
 
       setCurrentTask: (task: Task | null) => {
         set({ currentTask: task });
+      },
+
+      updateGameState: (players: Player[], taskResult: TaskResult | null) => {
+        set({ players, taskResult });
+      },
+
+      endGame: (winner: Player) => {
+        set({ isGameOver: true, winner, isInGame: false });
       }
     }),
     {
