@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface Move {
   diceValue: number;
-  previousPosition: number;  // Track previous position
+  previousPosition: number;
   newPosition: number;
   message?: string;
+  timestamp: number;
+  moveId?: string;
 }
 
 interface Player {
@@ -27,6 +29,7 @@ export default function LeaderboardPage() {
   });
   const [socket, setSocket] = useState<Socket | null>(null);
   const [movesHistory, setMovesHistory] = useState<{[playerId: string]: Move[]}>({});
+  const processedMoves = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const socket = io('http://localhost:3000', {
@@ -47,30 +50,44 @@ export default function LeaderboardPage() {
     socket.on('diceRollResult', (data) => {
       console.log('Dice roll update:', data);
       
-      // Get current position before updating
-      const currentPlayer = gameState.players.find(p => p.id === data.playerId);
-      const currentPosition = currentPlayer?.position ?? 0;
+      // Generate a unique move ID
+      const moveId = `${data.playerId}-${data.value}-${data.newPosition}-${Date.now()}`;
+      
+      // Check if we've already processed this move
+      if (processedMoves.current.has(moveId)) {
+        console.log('Move already processed:', moveId);
+        return;
+      }
 
-      // Update moves history with the new move
+      // Add move to processed set
+      processedMoves.current.add(moveId);
+
       setMovesHistory(prev => {
         const playerMoves = prev[data.playerId] || [];
-        const newMove = {
+        const lastMove = playerMoves[playerMoves.length - 1];
+        const previousPosition = lastMove ? lastMove.newPosition : 0;
+
+        // Create new move
+        const newMove: Move = {
           diceValue: data.value,
-          previousPosition: currentPosition,  // Use current position as previous
+          previousPosition: previousPosition,
           newPosition: data.newPosition,
-          message: data.message
+          message: data.message,
+          timestamp: Date.now(),
+          moveId
         };
-        console.log('Adding move for player:', data.playerId, newMove);
+
+        // Return updated history
         return {
           ...prev,
           [data.playerId]: [...playerMoves, newMove]
         };
       });
 
-      // Update game state to reflect new position
+      // Update game state
       setGameState(prevState => ({
         ...prevState,
-        players: (prevState.players || []).map(player =>
+        players: prevState.players.map(player =>
           player.id === data.playerId
             ? { ...player, position: data.newPosition }
             : player
@@ -81,22 +98,30 @@ export default function LeaderboardPage() {
     socket.on('gameStarted', (data) => {
       console.log('Game started:', data);
       if (data?.players) {
-        // Initialize moves history for all players
         const initialMovesHistory: {[playerId: string]: Move[]} = {};
-        data.players.forEach((player: Player) => {
+        const initialPlayers = data.players.map((player: { id: string; name: string }) => ({
+          ...player,
+          position: 0
+        }));
+        
+        initialPlayers.forEach((player: { id: string; name: string; position: number }) => {
           initialMovesHistory[player.id] = [];
         });
+        
+        // Clear processed moves on game start
+        processedMoves.current.clear();
         setMovesHistory(initialMovesHistory);
-        setGameState({ players: data.players });
+        setGameState({ players: initialPlayers });
       }
     });
 
     setSocket(socket);
 
     return () => {
+      console.log('Cleaning up socket connection');
       socket.disconnect();
     };
-  }, [gameState.players]); // Add dependency to access current player positions
+  }, []);
 
   // Safely calculate max moves
   const maxMoves = Math.max(...Object.values(movesHistory).map(moves => moves?.length ?? 0), 0);
