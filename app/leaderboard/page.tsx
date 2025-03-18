@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 
 interface Move {
   diceValue: number;
+  previousPosition: number;  // Track previous position
   newPosition: number;
   message?: string;
 }
@@ -38,33 +39,56 @@ export default function LeaderboardPage() {
 
     socket.on('gameStateUpdate', (data: GameState) => {
       console.log('Game state update:', data);
-      setGameState(data);
+      if (data?.players) {
+        setGameState(data);
+      }
     });
 
     socket.on('diceRollResult', (data) => {
       console.log('Dice roll update:', data);
+      
+      // Get current position before updating
+      const currentPlayer = gameState.players.find(p => p.id === data.playerId);
+      const currentPosition = currentPlayer?.position ?? 0;
+
+      // Update moves history with the new move
       setMovesHistory(prev => {
         const playerMoves = prev[data.playerId] || [];
+        const newMove = {
+          diceValue: data.value,
+          previousPosition: currentPosition,  // Use current position as previous
+          newPosition: data.newPosition,
+          message: data.message
+        };
+        console.log('Adding move for player:', data.playerId, newMove);
         return {
           ...prev,
-          [data.playerId]: [...playerMoves, {
-            diceValue: data.value,
-            newPosition: data.newPosition,
-            message: data.message
-          }]
+          [data.playerId]: [...playerMoves, newMove]
         };
       });
+
+      // Update game state to reflect new position
+      setGameState(prevState => ({
+        ...prevState,
+        players: (prevState.players || []).map(player =>
+          player.id === data.playerId
+            ? { ...player, position: data.newPosition }
+            : player
+        )
+      }));
     });
 
     socket.on('gameStarted', (data) => {
       console.log('Game started:', data);
-      // Initialize moves history for all players
-      const initialMovesHistory: {[playerId: string]: Move[]} = {};
-      data.players.forEach((player: Player) => {
-        initialMovesHistory[player.id] = [];
-      });
-      setMovesHistory(initialMovesHistory);
-      setGameState({ players: data.players });
+      if (data?.players) {
+        // Initialize moves history for all players
+        const initialMovesHistory: {[playerId: string]: Move[]} = {};
+        data.players.forEach((player: Player) => {
+          initialMovesHistory[player.id] = [];
+        });
+        setMovesHistory(initialMovesHistory);
+        setGameState({ players: data.players });
+      }
     });
 
     setSocket(socket);
@@ -72,15 +96,16 @@ export default function LeaderboardPage() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [gameState.players]); // Add dependency to access current player positions
 
-  // Get the maximum number of moves across all players
-  const maxMoves = Math.max(...Object.values(movesHistory).map(moves => moves.length), 0);
+  // Safely calculate max moves
+  const maxMoves = Math.max(...Object.values(movesHistory).map(moves => moves?.length ?? 0), 0);
 
   // Create array of move indices
   const moveIndices = Array.from({ length: maxMoves }, (_, i) => i);
 
-  if (gameState.players.length === 0) {
+  // Safe check for players array
+  if (!gameState?.players?.length) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-100 to-indigo-100 p-8">
         <div className="max-w-6xl mx-auto">
@@ -144,7 +169,7 @@ export default function LeaderboardPage() {
                               Rolled: {move.diceValue}
                             </div>
                             <div className="text-indigo-600">
-                              Position: {move.newPosition}
+                              From: {move.previousPosition} → {move.newPosition}
                             </div>
                             {move.message && (
                               <div className="text-sm text-green-600">

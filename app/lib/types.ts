@@ -1,5 +1,11 @@
 // src/lib/types.ts
 
+export interface LastMove {
+  from: number;
+  to: number;
+  value: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -7,6 +13,7 @@ export interface Player {
   corner: number; // 0, 1, 2, or 3 - corresponds to the corner they start from
   hasWon?: boolean;
   isActive?: boolean;
+  lastMove?: LastMove;
 }
 
 export interface Task {

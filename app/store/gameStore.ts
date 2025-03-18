@@ -12,6 +12,7 @@ interface GameStore extends GameState {
   setLobbyPlayers: (players: Player[]) => void;
   startGame: (gameId: string, players: Player[]) => void;
   setCurrentTask: (task: Task | null) => void;
+  updatePlayerPosition: (playerId: string, newPosition: number) => void;
 }
 
 const initialState: GameState = {
@@ -73,6 +74,16 @@ export const useGameStore = create<GameStore>()(
           isInLobby: false,
           isGameStarted: true
         });
+      },
+
+      updatePlayerPosition: (playerId: string, newPosition: number) => {
+        set((state) => ({
+          players: state.players.map(player =>
+            player.id === playerId
+              ? { ...player, position: newPosition }
+              : player
+          )
+        }));
       },
 
       setCurrentTask: (task: Task | null) => {

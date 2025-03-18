@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useGameStore } from '@/app/store/gameStore';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
+import Leaderboard from '@/app/components/Leaderboard';
 
 export default function GamePage() {
   const params = useParams();
@@ -65,7 +66,31 @@ export default function GamePage() {
       socket.on('diceRollResult', (data) => {
         console.log('Dice roll result:', data);
         if (data.newPosition !== undefined && gameId) {
-          startGame(gameId, currentPlayer ? [{ ...currentPlayer, position: data.newPosition }] : []);
+          const oldPosition = currentPlayer?.position || 0;
+          
+          // Update the game state
+          startGame(gameId, currentPlayer ? [{ 
+            ...currentPlayer, 
+            position: data.newPosition,
+            lastMove: {
+              from: oldPosition,
+              to: data.newPosition,
+              value: data.value
+            }
+          }] : []);
+
+          // Emit the state update to all clients
+          socket.emit('updateGameState', {
+            playerId,
+            gameId,
+            position: data.newPosition,
+            lastMove: {
+              from: oldPosition,
+              to: data.newPosition,
+              value: data.value
+            }
+          });
+
           if (data.hasWon) {
             hasGameEndedRef.current = true;
             setFinalPosition(data.newPosition);
@@ -171,8 +196,9 @@ export default function GamePage() {
           <p className="text-red-600 mb-4">{error}</p>
         )}
         
-        {/* Dice Component */}
-        <Dice onRoll={handleDiceRoll} />
+        <div className="flex justify-center">
+          <Dice onRoll={handleDiceRoll} />
+        </div>
       </div>
     </div>
   );
