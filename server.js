@@ -167,6 +167,16 @@ app.prepare().then(() => {
 
     // Player scanned QR code
     socket.on('qrScanned', ({ playerId, taskId, answer, isCorrect, currentPosition, moveForward, moveBackward }) => {
+      console.log('🎯 QR code scanned:', {
+        playerId,
+        taskId,
+        answer,
+        isCorrect,
+        currentPosition,
+        moveForward,
+        moveBackward
+      });
+      
       let gameId = null;
       let currentGame = null;
       
@@ -179,7 +189,10 @@ app.prepare().then(() => {
         }
       }
       
-      if (!gameId || !currentGame) return;
+      if (!gameId || !currentGame) {
+        console.log('❌ Game or player not found');
+        return;
+      }
       
       const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1) return;
@@ -189,6 +202,12 @@ app.prepare().then(() => {
       // Calculate new position based on answer
       const moveAmount = isCorrect ? moveForward : moveBackward;
       const newPosition = Math.max(0, Math.min(50, currentPosition + (isCorrect ? moveForward : -moveBackward)));
+      
+      console.log('🎯 Position calculation:', {
+        currentPosition,
+        moveAmount,
+        newPosition
+      });
       
       // Update player position
       currentGame.players[playerIndex].position = newPosition;
@@ -211,17 +230,32 @@ app.prepare().then(() => {
         moveBackward
       });
       
-      // Broadcast the move to all clients
+      // Create detailed message about task result
+      const resultMessage = isCorrect
+        ? `✅ Answered spiritual question correctly! Moving forward ${moveForward} tiles (${currentPosition} → ${newPosition})`
+        : `❌ Answered spiritual question incorrectly. Moving back ${moveBackward} tiles (${currentPosition} → ${newPosition})`;
+      
+      console.log('🎯 Sending game state update:', {
+        playerId,
+        position: newPosition,
+        lastMove: {
+          from: currentPosition,
+          to: newPosition,
+          message: resultMessage
+        },
+        isTaskResult: true
+      });
+      
+      // Broadcast the move to all clients with task result
       io.emit('gameStateUpdate', {
         playerId,
         position: newPosition,
         lastMove: {
           from: currentPosition,
           to: newPosition,
-          message: isCorrect 
-            ? `✅ Correct answer! Moving forward ${moveForward} tiles.`
-            : `❌ Incorrect answer. Moving back ${moveBackward} tiles.`
-        }
+          message: resultMessage
+        },
+        isTaskResult: true
       });
     });
 

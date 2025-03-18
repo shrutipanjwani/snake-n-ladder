@@ -11,6 +11,12 @@ interface MoveHistory {
   newPosition: number;
   timestamp: number;
   message?: string;
+  lastMove?: {
+    from: number;
+    to: number;
+    message: string;
+  };
+  isTaskResult?: boolean;
 }
 
 interface Player {
@@ -19,11 +25,15 @@ interface Player {
   position: number;
 }
 
-interface DiceRollResult {
-  value: number;
-  newPosition: number;
-  hasWon: boolean;
-  playerId?: string;
+interface GameStateUpdate {
+  playerId: string;
+  position: number;
+  lastMove: {
+    from: number;
+    to: number;
+    message: string;
+  };
+  isTaskResult?: boolean;
 }
 
 export default function Leaderboard() {
@@ -66,40 +76,55 @@ export default function Leaderboard() {
       console.log('Socket connected successfully');
     });
 
+    // Handle game state updates (including task results)
+    newSocket.on('gameStateUpdate', (data: GameStateUpdate) => {
+      console.log('Game state update received:', data);
+      
+      // Create move history entry for task completion
+      const newMove: MoveHistory = {
+        playerId: data.playerId,
+        value: 0,
+        previousPosition: data.lastMove.from,
+        newPosition: data.lastMove.to,
+        timestamp: Date.now(),
+        lastMove: data.lastMove,
+        isTaskResult: true // Mark this as a task result
+      };
+
+      setMoveHistory(prev => [...prev, newMove]);
+      
+      // Update local players
+      setLocalPlayers(currentPlayers => 
+        currentPlayers.map(p => 
+          p.id === data.playerId 
+            ? { ...p, position: data.position }
+            : p
+        )
+      );
+
+      // Update global store
+      updatePlayerPosition(data.playerId, data.position);
+    });
+
     // Handle dice roll result
-    newSocket.on('diceRollResult', (data: { 
-      playerId: string; 
-      value: number; 
-      newPosition: number;
-      message?: string;
-    }) => {
+    newSocket.on('diceRollResult', (data: any) => {
       console.log('Dice roll result received:', data);
       
-      // Get current player state
-      const currentPlayers = playersRef.current;
-      const player = currentPlayers.find(p => p.id === data.playerId);
-      
-      if (!player) {
-        console.warn('Player not found:', data.playerId);
-        return;
-      }
+      const player = playersRef.current.find(p => p.id === data.playerId);
+      if (!player) return;
 
-      // Create move history entry
       const newMove: MoveHistory = {
         playerId: data.playerId,
         value: data.value,
         previousPosition: player.position,
         newPosition: data.newPosition,
         timestamp: Date.now(),
-        message: data.message
+        message: data.message,
+        lastMove: data.lastMove
       };
 
-      console.log('Adding move to history:', newMove);
-
-      // Update move history
       setMoveHistory(prev => [...prev, newMove]);
-
-      // Update local players
+      
       setLocalPlayers(currentPlayers => 
         currentPlayers.map(p => 
           p.id === data.playerId 
@@ -108,7 +133,6 @@ export default function Leaderboard() {
         )
       );
 
-      // Update global store
       updatePlayerPosition(data.playerId, data.newPosition);
     });
 
@@ -122,7 +146,7 @@ export default function Leaderboard() {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-indigo-600 mb-4">Leaderboard</h2>
+      <h2 className="text-2xl font-bold text-indigo-600 mb-4">Snake & Ladder Leaderboard</h2>
       <div className="space-y-4">
         {localPlayers.map((player) => {
           const playerMoves = moveHistory.filter(move => move.playerId === player.id);
@@ -130,19 +154,46 @@ export default function Leaderboard() {
           
           return (
             <div key={player.id} className="border rounded-lg p-4 bg-gray-50">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold">{player.name}</h3>
                 <span className="text-indigo-600 font-bold">
-                  Position: {player.position}
+                  Position: {player.position}/50
                 </span>
               </div>
               
               {lastMove && (
-                <div className="mt-2 text-sm text-gray-600">
-                  <p>Last roll: {lastMove.value}</p>
-                  <p>Moved from {lastMove.previousPosition} to {lastMove.newPosition}</p>
-                  {lastMove.message && (
-                    <p className="text-indigo-600 font-medium mt-1">{lastMove.message}</p>
+                <div className="mt-2">
+                  {/* Task Result Message */}
+                  {lastMove.isTaskResult && lastMove.lastMove && (
+                    <div className={`p-3 rounded-lg ${
+                      lastMove.lastMove.message.includes('✅') 
+                        ? 'bg-green-50 text-green-700 border border-green-200' 
+                        : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}>
+                      <div className="font-medium">
+                        {lastMove.lastMove.message}
+                      </div>
+                      <div className="text-sm mt-1 opacity-75">
+                        Moved from position {lastMove.lastMove.from} to {lastMove.lastMove.to}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Dice Roll Message */}
+                  {!lastMove.isTaskResult && (
+                    <div className="bg-blue-50 text-blue-700 border border-blue-200 p-3 rounded-lg">
+                      <div className="font-medium">
+                        🎲 Rolled a {lastMove.value}
+                      </div>
+                      <div className="text-sm mt-1 opacity-75">
+                        Moved from position {lastMove.previousPosition} to {lastMove.newPosition}
+                      </div>
+                      {lastMove.message && (
+                        <div className="text-sm mt-1 font-medium">
+                          {lastMove.message}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

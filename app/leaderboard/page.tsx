@@ -21,12 +21,18 @@ interface Player {
 
 interface GameState {
   players: Player[];
+  lastMove?: {
+    from: number;
+    to: number;
+    message: string;
+  };
+  isTaskResult?: boolean;
+  playerId?: string;
+  position?: number;
 }
 
 export default function LeaderboardPage() {
-  const [gameState, setGameState] = useState<GameState>({
-    players: []
-  });
+  const [gameState, setGameState] = useState<GameState>({ players: [] });
   const [socket, setSocket] = useState<Socket | null>(null);
   const [movesHistory, setMovesHistory] = useState<{[playerId: string]: Move[]}>({});
   const processedMoves = useRef<Set<string>>(new Set());
@@ -42,8 +48,56 @@ export default function LeaderboardPage() {
 
     socket.on('gameStateUpdate', (data: GameState) => {
       console.log('Game state update:', data);
-      if (data?.players) {
-        setGameState(data);
+      
+      // If this is a task result, update the game state and moves history
+      if (data.isTaskResult && data.playerId && data.lastMove) {
+        // Generate a unique move ID for the task result
+        const moveId = `task-${data.playerId}-${Date.now()}`;
+        
+        // Check if we've already processed this move
+        if (processedMoves.current.has(moveId)) {
+          console.log('Task result already processed:', moveId);
+          return;
+        }
+
+        // Add move to processed set
+        processedMoves.current.add(moveId);
+
+        // Update game state with new position
+        setGameState(prevState => ({
+          ...prevState,
+          players: prevState.players.map(player =>
+            player.id === data.playerId
+              ? { ...player, position: data.lastMove?.to || player.position }
+              : player
+          )
+        }));
+
+        // Add task result as a new move in history
+        setMovesHistory(prev => {
+          const playerMoves = prev[data.playerId as string] || [];
+          
+          // Create new move for task result
+          const newMove: Move = {
+            diceValue: 0,
+            previousPosition: data.lastMove?.from || 0,
+            newPosition: data.lastMove?.to || 0,
+            message: data.lastMove?.message || '',
+            timestamp: Date.now(),
+            moveId
+          };
+          
+          return {
+            ...prev,
+            [data.playerId as string]: [...playerMoves, newMove]
+          };
+        });
+      } else {
+        // Handle non-task updates (like initial game state)
+        setGameState(prevState => ({
+          ...prevState,
+          players: data.players || prevState.players
+        }));
       }
     });
 
@@ -151,7 +205,7 @@ export default function LeaderboardPage() {
         <h1 className="text-3xl font-bold text-indigo-600 mb-6 text-center">
           Snake & Ladder Leaderboard
         </h1>
-        
+
         <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
@@ -190,14 +244,26 @@ export default function LeaderboardPage() {
                       <td key={`${player.id}-${index}`} className="p-4">
                         {move && (
                           <div className="space-y-2">
-                            <div className="font-medium">
-                              Rolled: {move.diceValue}
-                            </div>
-                            <div className="text-indigo-600">
-                              From: {move.previousPosition} → {move.newPosition}
-                            </div>
+                            {move.diceValue > 0 && (
+                              <>
+                                <div className="font-medium">
+                                  Rolled: {move.diceValue}
+                                </div>
+                                <div className="text-indigo-600">
+                                  From: {move.previousPosition} → {move.newPosition}
+                                </div>
+                              </>
+                            )}
                             {move.message && (
-                              <div className="text-sm text-green-600">
+                              <div className={`${
+                                move.message.includes('✅') 
+                                  ? 'text-green-600'
+                                  : move.message.includes('❌')
+                                    ? 'text-red-600'
+                                    : move.message.includes('QR code')
+                                      ? 'text-blue-600'
+                                      : 'text-green-600'
+                              } ${move.diceValue === 0 ? 'text-base font-medium' : 'text-sm'}`}>
                                 {move.message}
                               </div>
                             )}
