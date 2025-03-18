@@ -10,52 +10,75 @@ interface SnakeLadder {
   type: 'snake' | 'ladder';
 }
 
-// Define positions that have QR codes
-export const qrPositions: QRPosition[] = [
-  { position: 5, taskId: 'task1' },
-  { position: 12, taskId: 'task2' },
-  { position: 18, taskId: 'task3' },
-  { position: 25, taskId: 'task4' },
-  { position: 31, taskId: 'task5' },
-  { position: 38, taskId: 'task6' },
-  { position: 42, taskId: 'task7' },
-  { position: 45, taskId: 'task8' },
-  { position: 47, taskId: 'task9' },
-  { position: 49, taskId: 'task10' }
+// Game board configuration
+export interface GameElement {
+  start: number;
+  end: number;
+  type: 'snake' | 'ladder';
+}
+
+// Snake and ladder positions
+export const gameElements: GameElement[] = [
+  // Snakes (move backward)
+  { start: 48, end: 26, type: 'snake' },
+  { start: 43, end: 17, type: 'snake' },
+  { start: 39, end: 19, type: 'snake' },
+  { start: 34, end: 11, type: 'snake' },
+  { start: 25, end: 4, type: 'snake' },
+  
+  // Ladders (move forward)
+  { start: 3, end: 22, type: 'ladder' },
+  { start: 8, end: 31, type: 'ladder' },
+  { start: 16, end: 36, type: 'ladder' },
+  { start: 20, end: 41, type: 'ladder' },
+  { start: 28, end: 45, type: 'ladder' }
 ];
 
-// Define snakes and ladders
-export const snakesAndLadders: SnakeLadder[] = [
-  { start: 15, end: 5, type: 'snake' },
-  { start: 23, end: 16, type: 'snake' },
-  { start: 37, end: 19, type: 'snake' },
-  { start: 44, end: 28, type: 'snake' },
-  { start: 8, end: 15, type: 'ladder' },
-  { start: 21, end: 32, type: 'ladder' },
-  { start: 28, end: 41, type: 'ladder' },
-  { start: 36, end: 48, type: 'ladder' }
+// QR code positions with associated tasks
+export const qrPositions: QRPosition[] = [
+  { position: 6, taskId: 'task1' },
+  { position: 13, taskId: 'task2' },
+  { position: 23, taskId: 'task3' },
+  { position: 29, taskId: 'task4' },
+  { position: 35, taskId: 'task5' },
+  { position: 42, taskId: 'task6' },
+  { position: 47, taskId: 'task7' }
 ];
 
 // Helper functions
-export const hasQRCode = (position: number): string | null => {
-  const qrSpot = qrPositions.find(qr => qr.position === position);
-  return qrSpot ? qrSpot.taskId : null;
+export const getGameElement = (position: number): GameElement | null => {
+  return gameElements.find(element => element.start === position) || null;
 };
 
-export const getSnakeOrLadder = (position: number): SnakeLadder | null => {
-  return snakesAndLadders.find(sl => sl.start === position) || null;
+export const hasQRCode = (position: number): QRPosition | null => {
+  return qrPositions.find(qr => qr.position === position) || null;
 };
 
-// Calculate new position after a dice roll
-export const calculateNewPosition = (currentPosition: number, diceRoll: number): number => {
-  const newPosition = currentPosition + diceRoll;
+// Function to calculate final position after a move
+export const calculateFinalPosition = (currentPosition: number, diceValue: number): {
+  newPosition: number;
+  message: string;
+} => {
+  // First calculate the new position after dice roll
+  let newPosition = currentPosition + diceValue;
+  let message = '';
   
-  // Check if new position has a snake or ladder
-  const snakeOrLadder = getSnakeOrLadder(newPosition);
-  if (snakeOrLadder) {
-    return snakeOrLadder.end;
+  // Don't exceed board limit
+  if (newPosition > 50) {
+    return {
+      newPosition: currentPosition,
+      message: '🛑 Cannot move beyond position 50!'
+    };
   }
   
-  // Ensure position doesn't exceed board size
-  return Math.min(newPosition, 50);
+  // Check for snake or ladder
+  const element = getGameElement(newPosition);
+  if (element) {
+    newPosition = element.end;
+    message = element.type === 'snake' 
+      ? `🐍 Oops! Snake at ${element.start} moves you down to ${element.end}`
+      : `🪜 Yay! Ladder at ${element.start} takes you up to ${element.end}`;
+  }
+  
+  return { newPosition, message };
 }; 

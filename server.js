@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { Server } from 'socket.io';
+import { calculateFinalPosition } from './app/lib/gameConfig.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -306,7 +307,24 @@ app.prepare().then(() => {
       
       // Calculate new position
       const oldPosition = player.position;
-      const newPosition = Math.min(50, player.position + value);
+      
+      // Calculate new position with snake/ladder effects
+      const { newPosition, message } = calculateFinalPosition(oldPosition, value);
+      
+      // Log the move details
+      console.log('Move details:', {
+        player: player.name,
+        oldPosition,
+        diceRoll: value,
+        newPosition,
+        message
+      });
+
+      if (message) {
+        console.log('Special tile encountered:', message);
+      }
+      
+      // Update player position
       currentGame.players[playerIndex].position = newPosition;
       
       // Check for win condition
@@ -322,7 +340,8 @@ app.prepare().then(() => {
       console.log('Sending dice roll result:', {
         value,
         newPosition,
-        hasWon: currentGame.players[playerIndex].hasWon
+        hasWon: currentGame.players[playerIndex].hasWon,
+        message
       });
       
       const moveData = {
@@ -330,6 +349,7 @@ app.prepare().then(() => {
         value,
         newPosition,
         hasWon: currentGame.players[playerIndex].hasWon,
+        message,
         lastMove: {
           from: oldPosition,
           to: newPosition,

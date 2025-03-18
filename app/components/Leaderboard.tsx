@@ -10,6 +10,7 @@ interface MoveHistory {
   previousPosition: number;
   newPosition: number;
   timestamp: number;
+  message?: string;
 }
 
 interface Player {
@@ -66,7 +67,12 @@ export default function Leaderboard() {
     });
 
     // Handle dice roll result
-    newSocket.on('diceRollResult', (data: { playerId: string; value: number; newPosition: number }) => {
+    newSocket.on('diceRollResult', (data: { 
+      playerId: string; 
+      value: number; 
+      newPosition: number;
+      message?: string;
+    }) => {
       console.log('Dice roll result received:', data);
       
       // Get current player state
@@ -84,7 +90,8 @@ export default function Leaderboard() {
         value: data.value,
         previousPosition: player.position,
         newPosition: data.newPosition,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        message: data.message
       };
 
       console.log('Adding move to history:', newMove);
@@ -113,78 +120,35 @@ export default function Leaderboard() {
     };
   }, [updatePlayerPosition]);
 
-  // Group moves by player for display
-  const movesByPlayer = moveHistory.reduce((acc, move) => {
-    if (!acc[move.playerId]) {
-      acc[move.playerId] = [];
-    }
-    acc[move.playerId].push(move);
-    return acc;
-  }, {} as Record<string, MoveHistory[]>);
-
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Game History</h2>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-indigo-600 text-white">
-              <th className="px-4 py-2">Move #</th>
-              {localPlayers.map(player => (
-                <th key={player.id} className="px-4 py-2">
-                  <div>{player.name}</div>
-                  <div className="text-sm">
-                    Current: {player.position}
-                    {player.id === moveHistory[moveHistory.length - 1]?.playerId && (
-                      <span className="ml-2 text-yellow-300">
-                        (Last Move)
-                      </span>
-                    )}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {moveHistory
-              .reduce((acc, move) => {
-                const existing = acc.find(row => Math.abs(row.timestamp - move.timestamp) < 1000);
-                if (existing) {
-                  existing.moves[move.playerId] = move;
-                } else {
-                  acc.push({
-                    timestamp: move.timestamp,
-                    moves: { [move.playerId]: move }
-                  });
-                }
-                return acc;
-              }, [] as Array<{ timestamp: number, moves: Record<string, MoveHistory> }>)
-              .map((row, index, array) => (
-                <tr key={row.timestamp} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-4 py-2 text-center font-medium">{array.length - index}</td>
-                  {localPlayers.map(player => {
-                    const move = row.moves[player.id];
-                    return (
-                      <td key={player.id} className="px-4 py-2 border">
-                        {move ? (
-                          <div className="text-sm">
-                            <div className="font-medium text-green-600">
-                              Rolled: {move.value}
-                            </div>
-                            <div className="text-gray-600">
-                              {move.previousPosition} → {move.newPosition}
-                            </div>
-                          </div>
-                        ) : null}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
-              .reverse()}
-          </tbody>
-        </table>
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h2 className="text-2xl font-bold text-indigo-600 mb-4">Leaderboard</h2>
+      <div className="space-y-4">
+        {localPlayers.map((player) => {
+          const playerMoves = moveHistory.filter(move => move.playerId === player.id);
+          const lastMove = playerMoves[playerMoves.length - 1];
+          
+          return (
+            <div key={player.id} className="border rounded-lg p-4 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">{player.name}</h3>
+                <span className="text-indigo-600 font-bold">
+                  Position: {player.position}
+                </span>
+              </div>
+              
+              {lastMove && (
+                <div className="mt-2 text-sm text-gray-600">
+                  <p>Last roll: {lastMove.value}</p>
+                  <p>Moved from {lastMove.previousPosition} to {lastMove.newPosition}</p>
+                  {lastMove.message && (
+                    <p className="text-indigo-600 font-medium mt-1">{lastMove.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
