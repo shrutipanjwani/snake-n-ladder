@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useGameStore } from '@/app/store/gameStore';
 import { io } from 'socket.io-client';
+import { Player, TaskResult } from '../lib/types';
 
 interface MoveHistory {
   playerId: string;
@@ -11,18 +12,13 @@ interface MoveHistory {
   newPosition: number;
   timestamp: number;
   message?: string;
+  isTaskResult?: boolean;
   lastMove?: {
     from: number;
     to: number;
     message: string;
+    isTaskResult?: boolean;
   };
-  isTaskResult?: boolean;
-}
-
-interface Player {
-  id: string;
-  name: string;
-  position: number;
 }
 
 interface GameStateUpdate {
@@ -36,8 +32,13 @@ interface GameStateUpdate {
   isTaskResult?: boolean;
 }
 
-export default function Leaderboard() {
-  const { players, updatePlayerPosition } = useGameStore();
+interface LeaderboardProps {
+  players: Player[];
+  taskResult: TaskResult | null;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
+  const { updatePlayerPosition } = useGameStore();
   const [moveHistory, setMoveHistory] = useState<MoveHistory[]>([]);
   const [socket, setSocket] = useState<any>(null);
   const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
@@ -80,18 +81,30 @@ export default function Leaderboard() {
     newSocket.on('gameStateUpdate', (data: GameStateUpdate) => {
       console.log('Game state update received:', data);
       
-      // Create move history entry for task completion
-      const newMove: MoveHistory = {
-        playerId: data.playerId,
-        value: 0,
-        previousPosition: data.lastMove.from,
-        newPosition: data.lastMove.to,
-        timestamp: Date.now(),
-        lastMove: data.lastMove,
-        isTaskResult: true // Mark this as a task result
-      };
+      // Only create move history for task completion if it's not already recorded
+      if (data.isTaskResult) {
+        const existingTaskMove = moveHistory.find(move => 
+          move.isTaskResult && 
+          move.playerId === data.playerId && 
+          move.timestamp > Date.now() - 5000 // Check within last 5 seconds
+        );
 
-      setMoveHistory(prev => [...prev, newMove]);
+        if (!existingTaskMove) {
+          const newMove: MoveHistory = {
+            playerId: data.playerId,
+            value: 0,
+            previousPosition: data.lastMove.from,
+            newPosition: data.lastMove.to,
+            timestamp: Date.now(),
+            lastMove: {
+              ...data.lastMove,
+              isTaskResult: true
+            }
+          };
+
+          setMoveHistory(prev => [...prev, newMove]);
+        }
+      }
       
       // Update local players
       setLocalPlayers(currentPlayers => 
@@ -146,7 +159,7 @@ export default function Leaderboard() {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-indigo-600 mb-4">Snake & Ladder Leaderboard</h2>
+      <h2 className="text-2xl font-bold text-indigo-600 mb-4">The game of Life</h2>
       <div className="space-y-4">
         {localPlayers.map((player) => {
           const playerMoves = moveHistory.filter(move => move.playerId === player.id);
@@ -157,14 +170,14 @@ export default function Leaderboard() {
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold">{player.name}</h3>
                 <span className="text-indigo-600 font-bold">
-                  Position: {player.position}/50
+                  Current Position: {player.position}
                 </span>
               </div>
               
               {lastMove && (
                 <div className="mt-2">
                   {/* Task Result Message */}
-                  {lastMove.isTaskResult && lastMove.lastMove && (
+                  {lastMove.lastMove?.isTaskResult && (
                     <div className={`p-3 rounded-lg ${
                       lastMove.lastMove.message.includes('✅') 
                         ? 'bg-green-50 text-green-700 border border-green-200' 
@@ -174,13 +187,13 @@ export default function Leaderboard() {
                         {lastMove.lastMove.message}
                       </div>
                       <div className="text-sm mt-1 opacity-75">
-                        Moved from position {lastMove.lastMove.from} to {lastMove.lastMove.to}
+                        Position changed: {lastMove.lastMove.from} → {lastMove.lastMove.to}
                       </div>
                     </div>
                   )}
                   
-                  {/* Dice Roll Message */}
-                  {!lastMove.isTaskResult && (
+                  {/* Regular Move Message */}
+                  {!lastMove.lastMove?.isTaskResult && (
                     <div className="bg-blue-50 text-blue-700 border border-blue-200 p-3 rounded-lg">
                       <div className="font-medium">
                         🎲 Rolled a {lastMove.value}
@@ -204,3 +217,5 @@ export default function Leaderboard() {
     </div>
   );
 }
+
+export default Leaderboard;

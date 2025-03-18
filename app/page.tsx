@@ -108,7 +108,7 @@ export default function Home() {
       <div className="admin-wrapper">
         <div className="card" style={{ marginBottom: '2rem' }}>
           <div className="card-header">
-            <h2 className="card-title">Snake & Ladder Game</h2>
+            <h2 className="card-title">The game of Life</h2>
           </div>
           <div className="card-content">
             <form onSubmit={handleJoinGame} className="login-form">

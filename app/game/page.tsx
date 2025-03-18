@@ -7,7 +7,6 @@ import { useGameStore } from '../store/gameStore';
 import { Player, TaskResult } from '../lib/types';
 import GameBoard from '../components/GameBoard';
 import Leaderboard from '../components/Leaderboard';
-import QRScanner from '../components/QRScanner';
 import TaskScreen from '../components/TaskScreen';
 
 export default function GamePage() {
@@ -107,10 +106,8 @@ export default function GamePage() {
               
               {/* Task or QR Scanner */}
               <div className="mt-6">
-                {currentTask ? (
+                {currentTask && (
                   <TaskScreen task={currentTask} />
-                ) : (
-                  <QRScanner />
                 )}
               </div>
             </div>

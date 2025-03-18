@@ -3,6 +3,7 @@ import { parse } from 'url';
 import next from 'next';
 import { Server } from 'socket.io';
 import { calculateFinalPosition } from './app/lib/gameConfig.js';
+import { spiritualTasks } from './app/store/tasks.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -12,6 +13,16 @@ const handle = app.getRequestHandler();
 const waitingPlayers = [];
 const activeGames = new Map();
 let adminSocketId = null; // Track admin socket ID
+
+// Helper function to find game by player ID
+function findGameByPlayerId(playerId) {
+  for (const [_, game] of activeGames.entries()) {
+    if (game.players.some(p => p.id === playerId)) {
+      return game;
+    }
+  }
+  return null;
+}
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -92,14 +103,14 @@ app.prepare().then(() => {
       
       // Find any active game
       for (const [gameId, game] of activeGames.entries()) {
-        // Notify all players that game has ended
+        // Notify all players that game has ended by admin
         game.players.forEach(player => {
           const playerSocket = io.sockets.sockets.get(player.id);
           if (playerSocket) {
             console.log('Sending gameEnded event to player:', player.id);
-            // Send the game end event with the player's final position
             playerSocket.emit('gameEnded', { 
-              message: 'Game ended by admin'
+              message: 'Game ended by admin',
+              winner: game.winner // Include the winner info
             });
           }
         });
@@ -115,7 +126,7 @@ app.prepare().then(() => {
       
       // Broadcast game ended event to all clients
       console.log('Broadcasting gameEnded event to all clients');
-      io.emit('gameEnded');
+      io.emit('gameEnded', { adminEnded: true });
     });
 
     // Handle player rejoining game
@@ -215,7 +226,26 @@ app.prepare().then(() => {
       // Check for win condition
       if (newPosition >= 50) {
         currentGame.players[playerIndex].hasWon = true;
-        socket.emit('playerWon', { playerId });
+        const winner = currentGame.players[playerIndex];
+        
+        // Don't mark game as ended, just mark the winner
+        currentGame.winner = {
+          id: winner.id,
+          name: winner.name,
+          finalPosition: newPosition
+        };
+        
+        // Update game state with winner
+        activeGames.set(gameId, currentGame);
+        
+        // Broadcast playerWon event to all clients
+        io.emit('playerWon', { 
+          playerId: winner.id,
+          winnerName: winner.name,
+          finalPosition: newPosition
+        });
+        
+        // Don't emit gameEnded event here - let admin handle that
       }
       
       // Update game state
@@ -232,8 +262,8 @@ app.prepare().then(() => {
       
       // Create detailed message about task result
       const resultMessage = isCorrect
-        ? `✅ Answered spiritual question correctly! Moving forward ${moveForward} tiles (${currentPosition} → ${newPosition})`
-        : `❌ Answered spiritual question incorrectly. Moving back ${moveBackward} tiles (${currentPosition} → ${newPosition})`;
+        ? `Answered question correctly! Moving forward ${moveForward} tiles (${currentPosition} → ${newPosition})`
+        : `Answered question incorrectly. Moving back ${moveBackward} tiles (${currentPosition} → ${newPosition})`;
       
       console.log('🎯 Sending game state update:', {
         playerId,
@@ -264,6 +294,49 @@ app.prepare().then(() => {
       console.log('Game state update received:', data);
       // Broadcast the update to all clients except the sender
       socket.broadcast.emit('gameStateUpdate', data);
+    });
+
+    // Handle game state request
+    socket.on('requestGameState', (data) => {
+      const { hasExistingState } = data || {};
+      const game = Array.from(activeGames.values()).find(g => g.players.some(p => p.id === socket.id)) || Array.from(activeGames.values())[0];
+      
+      if (game) {
+        // If client has existing state, send only updates
+        if (hasExistingState) {
+          socket.emit('currentGameState', {
+            gameState: {
+              players: game.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                position: p.position
+              })),
+              winner: game.players.find(p => p.hasWon)
+            }
+          });
+        } else {
+          // Send full state including moves history
+          socket.emit('currentGameState', {
+            gameState: {
+              players: game.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                position: p.position
+              })),
+              winner: game.players.find(p => p.hasWon)
+            },
+            movesHistory: game.movesHistory || {},
+            processedMoves: Array.from(game.processedMoves || new Set())
+          });
+        }
+      } else {
+        // No active game
+        socket.emit('currentGameState', {
+          gameState: { players: [] },
+          movesHistory: {},
+          processedMoves: []
+        });
+      }
     });
 
     // Player disconnects
@@ -309,97 +382,166 @@ app.prepare().then(() => {
     });
 
     // Handle dice roll
-    socket.on('rollDice', ({ playerId, value }) => {
-      console.log('Received dice roll:', { playerId, value });
-      
-      let gameId = null;
-      let currentGame = null;
-      
+    socket.on('rollDice', (data) => {
+      const { playerId, value } = data;
+      console.log('Dice roll:', { playerId, value });
+
       // Find the game this player is in
-      for (const [id, game] of activeGames.entries()) {
-        if (game.players.some(p => p.id === playerId)) {
-          gameId = id;
-          currentGame = game;
-          break;
-        }
-      }
-      
-      if (!gameId || !currentGame) {
-        console.log('No active game found for player:', playerId);
-        socket.emit('error', { message: 'No active game found' });
+      const currentGame = findGameByPlayerId(playerId);
+      if (!currentGame) {
+        console.log('No game found for player:', playerId);
         return;
       }
-      
+
+      // Find the player in the game
       const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1) {
         console.log('Player not found in game:', playerId);
-        socket.emit('error', { message: 'Player not found in game' });
         return;
       }
-      
-      const player = currentGame.players[playerIndex];
-      if (player.hasWon) {
-        socket.emit('error', { message: 'Player has already won' });
-        return;
-      }
-      
-      // Calculate new position
-      const oldPosition = player.position;
-      
-      // Calculate new position with snake/ladder effects
-      const { newPosition, message } = calculateFinalPosition(oldPosition, value);
-      
-      // Log the move details
-      console.log('Move details:', {
-        player: player.name,
-        oldPosition,
-        diceRoll: value,
+
+      const currentPosition = currentGame.players[playerIndex].position;
+      const { newPosition, message, requiresTask } = calculateFinalPosition(currentPosition, value);
+
+      console.log('Move calculation:', {
+        currentPosition,
+        diceValue: value,
         newPosition,
-        message
+        isSpecialTile: requiresTask
       });
 
-      if (message) {
-        console.log('Special tile encountered:', message);
-      }
-      
-      // Update player position
-      currentGame.players[playerIndex].position = newPosition;
-      
-      // Check for win condition
-      if (newPosition >= 50) {
-        currentGame.players[playerIndex].hasWon = true;
-        socket.emit('playerWon', { playerId });
-      }
-      
-      // Update game state
-      activeGames.set(gameId, currentGame);
-      
-      // Send update to the player who rolled
-      console.log('Sending dice roll result:', {
-        value,
-        newPosition,
-        hasWon: currentGame.players[playerIndex].hasWon,
-        message
-      });
-      
+      // Prepare move data
       const moveData = {
         playerId,
         value,
         newPosition,
-        hasWon: currentGame.players[playerIndex].hasWon,
-        message,
-        lastMove: {
-          from: oldPosition,
-          to: newPosition,
-          value: value
-        }
+        message
       };
 
-      // Send the result back to the same socket that sent the roll
-      socket.emit('diceRollResult', moveData);
-      
-      // Broadcast the move to all other clients
-      socket.broadcast.emit('diceRollResult', moveData);
+      // If landed on special tile, select a random task
+      if (requiresTask) {
+        const randomIndex = Math.floor(Math.random() * spiritualTasks.length);
+        const randomTask = spiritualTasks[randomIndex];
+        
+        console.log('Selected random task:', {
+          taskId: randomTask.id,
+          position: newPosition
+        });
+        
+        moveData.task = {
+          taskId: randomTask.id,
+          question: randomTask.question,
+          options: randomTask.options,
+          moveForward: randomTask.moveForward,
+          moveBackward: randomTask.moveBackward
+        };
+        
+        // Override the message to show it's a special tile
+        moveData.message = `✨ You landed on a special tile! Answer this spiritual question:`;
+      }
+
+      // Update player position
+      currentGame.players[playerIndex].position = newPosition;
+      activeGames.set(currentGame.id, currentGame);
+
+      // Emit the result to all clients
+      io.emit('diceRollResult', moveData);
+
+      // Check for win condition
+      if (newPosition >= 50) {
+        const winner = currentGame.players[playerIndex];
+        currentGame.winner = {
+          id: winner.id,
+          name: winner.name,
+          finalPosition: newPosition
+        };
+        
+        // Update game state with winner
+        activeGames.set(currentGame.id, currentGame);
+        
+        // Broadcast playerWon event to all clients
+        io.emit('playerWon', { 
+          playerId: winner.id,
+          winnerName: winner.name,
+          finalPosition: newPosition
+        });
+      }
+    });
+
+    // Handle task completion
+    socket.on('taskCompleted', (data) => {
+      const { playerId, taskId, answer, isCorrect } = data;
+      console.log('Task completed:', { playerId, taskId, answer, isCorrect });
+
+      // Find the game and player
+      const currentGame = findGameByPlayerId(playerId);
+      if (!currentGame) return;
+
+      const playerIndex = currentGame.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) return;
+
+      // Find the task
+      const task = spiritualTasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const currentPosition = currentGame.players[playerIndex].position;
+      let newPosition;
+      let resultMessage;
+
+      // Calculate new position based on answer
+      if (isCorrect) {
+        newPosition = Math.min(currentPosition + task.moveForward, 50);
+        resultMessage = `✅ Correct answer! Moving forward ${task.moveForward} tiles.`;
+      } else {
+        newPosition = Math.max(currentPosition - task.moveBackward, 1);
+        resultMessage = `❌ Incorrect answer. Moving back ${task.moveBackward} tiles.`;
+      }
+
+      // Update player position
+      currentGame.players[playerIndex].position = newPosition;
+      activeGames.set(currentGame.id, currentGame);
+
+      // Emit result to all clients
+      io.emit('taskCompleted', {
+        playerId,
+        success: isCorrect,
+        newPosition,
+        moveForward: task.moveForward,
+        moveBackward: task.moveBackward,
+        message: resultMessage
+      });
+
+      // Emit game state update for leaderboard
+      io.emit('gameStateUpdate', {
+        players: currentGame.players,
+        lastMove: {
+          from: currentPosition,
+          to: newPosition,
+          message: resultMessage
+        },
+        isTaskResult: true,
+        playerId
+      });
+
+      // Check for win condition after task completion
+      if (newPosition >= 50) {
+        const winner = currentGame.players[playerIndex];
+        currentGame.winner = {
+          id: winner.id,
+          name: winner.name,
+          finalPosition: newPosition
+        };
+        
+        // Update game state with winner
+        activeGames.set(currentGame.id, currentGame);
+        
+        // Broadcast playerWon event to all clients
+        io.emit('playerWon', { 
+          playerId: winner.id,
+          winnerName: winner.name,
+          finalPosition: newPosition
+        });
+      }
     });
 
     // Handle player connection
@@ -531,74 +673,8 @@ app.prepare().then(() => {
 
   // Function to generate spiritual tasks
   function generateTasks() {
-    // This would typically come from a database, but we'll hardcode for simplicity
-    return [
-      {
-        id: 'task1',
-        question: 'What is the purpose of meditation?',
-        options: [
-          'To clear the mind and find inner peace',
-          'To become popular',
-          'To show off to others',
-          'To avoid responsibilities'
-        ],
-        correctAnswer: 0, // Index of correct option
-        moveForward: 5,
-        moveBackward: 3
-      },
-      {
-        id: 'task2',
-        question: 'What does "Nirankari" focus on?',
-        options: [
-          'Material wealth',
-          'Political power',
-          'Universal brotherhood and spiritual awakening',
-          'Business success'
-        ],
-        correctAnswer: 2,
-        moveForward: 6,
-        moveBackward: 2
-      },
-      {
-        id: 'task3',
-        question: 'Which of these is a spiritual practice?',
-        options: [
-          'Gossiping',
-          'Meditation',
-          'Criticizing others',
-          'Accumulating wealth'
-        ],
-        correctAnswer: 1,
-        moveForward: 4,
-        moveBackward: 3
-      },
-      {
-        id: 'task4',
-        question: 'What is the foundation of spiritual growth?',
-        options: [
-          'Self-centeredness',
-          'Comparison with others',
-          'Self-reflection and humility',
-          'Ignoring others'
-        ],
-        correctAnswer: 2,
-        moveForward: 7,
-        moveBackward: 4
-      },
-      {
-        id: 'task5',
-        question: 'What does spiritual awakening lead to?',
-        options: [
-          'Separation from others',
-          'Inner peace and harmony',
-          'Material success',
-          'Pride and ego'
-        ],
-        correctAnswer: 1,
-        moveForward: 5,
-        moveBackward: 2
-      }
-    ];
+    // Return tasks from tasks.js
+    return spiritualTasks;
   }
 
   server.listen(3000, (err) => {
