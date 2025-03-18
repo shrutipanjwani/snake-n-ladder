@@ -75,11 +75,13 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-md w-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <div className="text-xl font-semibold">Connecting to server...</div>
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-header">
+            <h2 className="login-title">Connecting to Server</h2>
+          </div>
+          <div className="spinner-container">
+            <div className="spinner"></div>
           </div>
         </div>
       </div>
@@ -88,11 +90,13 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-md w-96">
-          <div className="text-center">
-            <div className="text-xl font-semibold text-red-600 mb-4">Connection Error</div>
-            <div className="text-gray-600">{error}</div>
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-header">
+            <h2 className="login-title">Connection Error</h2>
+          </div>
+          <div className="card-content">
+            <p className="error-message">{error}</p>
           </div>
         </div>
       </div>
@@ -100,43 +104,57 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-md overflow-hidden p-6">
-          <h1 className="text-2xl font-bold mb-6">Snake & Ladder Game</h1>
-          
-          <form onSubmit={handleJoinGame} className="mb-8">
-            <div className="flex gap-4">
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Enter your name"
-                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                required
-              />
-              <button
-                type="submit"
-                className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                Join Game
-              </button>
-            </div>
-          </form>
-
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h2 className="text-xl font-semibold mb-4">Waiting Players ({waitingPlayers.length})</h2>
-            <div className="space-y-2">
-              {waitingPlayers.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex justify-between items-center bg-white p-3 rounded shadow"
-                >
-                  <span>{player.name}</span>
-                  <span>ID: #{player.id.slice(-4)}</span>
+    <div className="admin-container">
+      <div className="admin-wrapper">
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <div className="card-header">
+            <h2 className="card-title">Snake & Ladder Game</h2>
+          </div>
+          <div className="card-content">
+            <form onSubmit={handleJoinGame} className="login-form">
+              <div className="form-group">
+                <label className="form-label" htmlFor="playerName">Your Name</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <input
+                    id="playerName"
+                    type="text"
+                    className="form-input"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="Enter your name"
+                    required
+                  />
+                  <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
+                    Join Game
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Waiting Players ({waitingPlayers.length})</h2>
+          </div>
+          <div className="card-content">
+            {waitingPlayers.length > 0 ? (
+              <div className="player-list">
+                {waitingPlayers.map((player) => (
+                  <div key={player.id} className="player-item">
+                    <span className="player-name">{player.name}</span>
+                    <span className="player-id">ID: #{player.id.slice(-4)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-players">
+                No players waiting
+              </div>
+            )}
+          </div>
+          <div className="card-footer">
+            <p>Game will start when 4 players have joined</p>
           </div>
         </div>
       </div>
