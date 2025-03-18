@@ -146,7 +146,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-indigo-600 mb-4">Snake & Ladder Leaderboard</h2>
+      <h2 className="text-2xl font-bold text-indigo-600 mb-4">The game of Life</h2>
       <div className="space-y-4">
         {localPlayers.map((player) => {
           const playerMoves = moveHistory.filter(move => move.playerId === player.id);

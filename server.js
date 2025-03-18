@@ -232,8 +232,8 @@ app.prepare().then(() => {
       
       // Create detailed message about task result
       const resultMessage = isCorrect
-        ? `✅ Answered spiritual question correctly! Moving forward ${moveForward} tiles (${currentPosition} → ${newPosition})`
-        : `❌ Answered spiritual question incorrectly. Moving back ${moveBackward} tiles (${currentPosition} → ${newPosition})`;
+        ? `Answered question correctly! Moving forward ${moveForward} tiles (${currentPosition} → ${newPosition})`
+        : `Answered question incorrectly. Moving back ${moveBackward} tiles (${currentPosition} → ${newPosition})`;
       
       console.log('🎯 Sending game state update:', {
         playerId,

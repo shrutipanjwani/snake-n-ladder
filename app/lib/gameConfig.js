@@ -65,7 +65,7 @@ export const calculateFinalPosition = (currentPosition, diceValue) => {
   if (qrCode) {
     requiresQR = true;
     taskId = qrCode.taskId;
-    message = `📱 Found a QR code at position ${newPosition}! Scan to answer the question.`;
+    message = `Found a QR code at position ${newPosition}! Scan to answer the question.`;
   }
 
   return { newPosition, message, requiresQR, taskId }; 

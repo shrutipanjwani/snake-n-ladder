@@ -186,106 +186,103 @@ export default function LeaderboardPage() {
   // Safe check for players array
   if (!gameState?.players?.length) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-purple-100 to-indigo-100 p-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-indigo-600 mb-8 text-center">
-            Snake & Ladder Leaderboard
-          </h1>
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <p className="text-gray-600">Waiting for game to start...</p>
-          </div>
+      <div className="leaderboard-container">
+      <div className="leaderboard-content">
+        <h1 className="leaderboard-title">
+         The game of Life
+        </h1>
+        <div className="loading-state">
+          <p className="loading-text">Waiting for game to start</p>
         </div>
       </div>
+    </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-100 to-indigo-100 p-4">
-      <div className="max-w-[95%] mx-auto">
-        <h1 className="text-3xl font-bold text-indigo-600 mb-6 text-center">
-          Snake & Ladder Leaderboard
+    <div className="leaderboard-container">
+      <div className="leaderboard-content">
+        <h1 className="leaderboard-title">
+          The game of life
         </h1>
 
-        <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-indigo-100">
-                <th className="p-4 text-left font-semibold text-indigo-700 border-b border-indigo-200 min-w-[80px]">
-                  Move #
-                </th>
-                {gameState.players.map(player => (
-                  <th 
-                    key={player.id} 
-                    className="p-4 text-left font-semibold text-indigo-700 border-b border-indigo-200"
-                    style={{ minWidth: '200px' }}
-                  >
-                    <div className="text-lg">{player.name}</div>
-                    <div className="text-sm text-indigo-500 mt-1">
-                      Current Position: {player.position}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {moveIndices.map(index => (
-                <tr 
-                  key={index} 
-                  className={`border-b border-indigo-100 ${
-                    index % 2 === 0 ? 'bg-white' : 'bg-indigo-50'
-                  }`}
-                >
-                  <td className="p-4 font-medium text-indigo-600">
-                    {index + 1}
-                  </td>
-                  {gameState.players.map(player => {
-                    const move = movesHistory[player.id]?.[index];
-                    return (
-                      <td key={`${player.id}-${index}`} className="p-4">
-                        {move && (
-                          <div className="space-y-2">
-                            {move.diceValue > 0 && (
-                              <>
-                                <div className="font-medium">
-                                  Rolled: {move.diceValue}
-                                </div>
-                                <div className="text-indigo-600">
-                                  From: {move.previousPosition} → {move.newPosition}
-                                </div>
-                              </>
-                            )}
-                            {move.message && (
-                              <div className={`${
-                                move.message.includes('✅') 
-                                  ? 'text-green-600'
-                                  : move.message.includes('❌')
-                                    ? 'text-red-600'
-                                    : move.message.includes('QR code')
-                                      ? 'text-blue-600'
-                                      : 'text-green-600'
-                              } ${move.diceValue === 0 ? 'text-base font-medium' : 'text-sm'}`}>
-                                {move.message}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-              {maxMoves === 0 && Object.keys(movesHistory).length === 0 && (
+        <div className="leaderboard-card">
+          <div className="overflow-x-auto">
+            <table className="leaderboard-table">
+              <thead>
                 <tr>
-                  <td 
-                    colSpan={gameState.players.length + 1} 
-                    className="p-6 text-center text-gray-500"
-                  >
-                    Game started! Waiting for first move...
-                  </td>
+                  <th className="leaderboard-move-number" style={{ color: '#333', fontSize: "1rem" }}>
+                    Move #
+                  </th>
+                  {gameState.players.map(player => (
+                    <th 
+                      key={player.id} 
+                      className="leaderboard-player-header"
+                    >
+                      <div className="leaderboard-player-name">{player.name}</div>
+                      <div className="leaderboard-player-position">
+                        Current Position: {player.position}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {moveIndices.map(index => (
+                  <tr key={index}>
+                    <td className="leaderboard-move-number">
+                      {index + 1}
+                    </td>
+                    {gameState.players.map(player => {
+                      const move = movesHistory[player.id]?.[index];
+                      return (
+                        <td key={`${player.id}-${index}`}>
+                          {move && (
+                            <div className="move-details">
+                              {move.diceValue > 0 && (
+                                <>
+                                  <div className="dice-roll">
+                                    Rolled: {move.diceValue}
+                                  </div>
+                                  <div className="position-change">
+                                    From: {move.previousPosition} → {move.newPosition}
+                                  </div>
+                                </>
+                              )}
+                              {move.message && (
+                                <div className={`message ${
+                                  move.message.includes('✅') 
+                                    ? 'message-success'
+                                    : move.message.includes('❌')
+                                      ? 'message-error'
+                                      : move.message.includes('QR code')
+                                        ? 'message-info'
+                                        : 'message-success'
+                                }`}>
+                                  {move.message}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                {maxMoves === 0 && Object.keys(movesHistory).length === 0 && (
+                  <tr>
+                    <td 
+                      colSpan={gameState.players.length + 1} 
+                      className="loading-text"
+                      style={{ textAlign: 'center', padding: '1.5rem' }}
+                    >
+                      Game started! Waiting for first move...
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

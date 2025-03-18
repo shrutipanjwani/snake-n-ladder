@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { useGameStore } from '@/app/store/gameStore';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
 import { getTaskById } from '@/app/store/tasks';
-import QRScanner from '@/app/components/QRScanner';
 
 interface Task {
   id: string;
@@ -29,11 +27,9 @@ interface GameState {
 export default function GamePage() {
   const params = useParams();
   const playerId = params.playerId as string;
-  const { currentPlayer, gameId, startGame, resetGame } = useGameStore();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameEnded, setGameEnded] = useState(false);
   const [finalPosition, setFinalPosition] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [gameState, setGameState] = useState<GameState>({
     currentPosition: 0,
@@ -209,9 +205,9 @@ export default function GamePage() {
     if (gameState.requiresQR && gameState.currentTask) {
       return (
         <div className="task-section p-6 bg-white rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold mb-4">Spiritual Question</h2>
+          <h2 className="text-2xl font-bold mb-4">Question</h2>
           <p className="text-lg mb-6">{gameState.currentTask.question}</p>
-          <div className="space-y-4">
+          <div className="space-y-4 flex flex-col gap-4">
             {gameState.currentTask.options.map((option, index) => (
               <button
                 key={index}
@@ -225,7 +221,7 @@ export default function GamePage() {
               </button>
             ))}
           </div>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <div className="mt-8 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-700">
               Correct answer moves you forward {gameState.currentTask.moveForward} tiles.
               <br />
@@ -260,7 +256,7 @@ export default function GamePage() {
           <div className="card-content text-center">
             <div className="game-result-icon">🏆</div>
             <h1 className="game-title">Game Ended</h1>
-            <p className="game-description">Thank you for playing Snake & Ladder!</p>
+            <p className="game-description">Thank you for playing the game of Life!</p>
             
             <div className="stat-card" style={{ margin: '2rem auto' }}>
               <div className="stat-header">
@@ -293,7 +289,7 @@ export default function GamePage() {
             <path d="M12 14v0"></path>
             <path d="M15.5 14v0"></path>
           </svg>
-          <h1 className="card-title">Snake & Ladder Game</h1>
+          <h1 className="card-title">The game of Life</h1>
         </div>
 
         <div className="card-content">
@@ -304,12 +300,7 @@ export default function GamePage() {
           </div>
           
           {renderGameContent()}
-          
-          {gameState.message && (
-            <div className="message-container mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-center text-gray-700">{gameState.message}</p>
-            </div>
-          )}
+        
         </div>
       </div>
     </div>
