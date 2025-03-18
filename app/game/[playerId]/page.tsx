@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Dice from '@/app/components/Dice';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { getTaskById } from '@/app/store/tasks';
+import { socket as globalSocket, initializeSocket } from '@/app/lib/socket';
 
 interface Task {
   id: string;
@@ -50,19 +51,18 @@ export default function GamePage() {
   const hasGameEndedRef = useRef(false);
 
   useEffect(() => {
-    // Initialize socket connection
-    const newSocket = io('http://localhost:3000', {
-      transports: ['websocket']
-    });
+    // Initialize socket connection using the global socket
+    const socketInstance = initializeSocket();
+    setSocket(socketInstance);
+    socketRef.current = socketInstance;
 
-    newSocket.on('connect', () => {
+    socketInstance.on('connect', () => {
       console.log('Connected to game server');
       setIsConnecting(false);
-      socketRef.current = newSocket;
     });
 
     // Handle dice roll results
-    newSocket.on('diceRollResult', (data: {
+    socketInstance.on('diceRollResult', (data: {
       playerId: string;
       value: number;
       newPosition: number;
@@ -109,7 +109,7 @@ export default function GamePage() {
     });
 
     // Handle task completion results
-    newSocket.on('taskCompleted', (data: {
+    socketInstance.on('taskCompleted', (data: {
       playerId: string;
       success: boolean;
       newPosition: number;
@@ -155,7 +155,7 @@ export default function GamePage() {
     });
 
     // Handle game end
-    newSocket.on('gameEnded', (data: { winner?: { id: string; name: string }, adminEnded?: boolean }) => {
+    socketInstance.on('gameEnded', (data: { winner?: { id: string; name: string }, adminEnded?: boolean }) => {
       console.log('Game ended:', data);
       
       // Only end the game if it was ended by admin
@@ -187,7 +187,7 @@ export default function GamePage() {
     });
 
     // Listen for player won event
-    newSocket.on('playerWon', (data: { playerId: string, winnerName: string, finalPosition: number }) => {
+    socketInstance.on('playerWon', (data: { playerId: string, winnerName: string, finalPosition: number }) => {
       console.log('🏆 Player won:', data);
       const isCurrentPlayer = data.playerId === playerId;
       
@@ -217,11 +217,9 @@ export default function GamePage() {
       localStorage.setItem(`gameState_${playerId}`, JSON.stringify(newState));
     });
 
-    setSocket(newSocket);
-
     return () => {
       console.log('Cleaning up socket connection');
-      newSocket.disconnect();
+      socketInstance.disconnect();
     };
   }, [playerId]);
 
