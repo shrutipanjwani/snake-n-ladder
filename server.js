@@ -30,7 +30,12 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  const io = new Server(server);
+  const io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST']
+    }
+  });
 
   // Socket.io connection handler
   io.on('connection', (socket) => {
@@ -677,8 +682,9 @@ app.prepare().then(() => {
     return spiritualTasks;
   }
 
-  server.listen(3000, (err) => {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, '0.0.0.0', (err) => {
     if (err) throw err;
-    console.log('> Ready on http://localhost:3000');
+    console.log(`> Ready on http://0.0.0.0:${PORT}`);
   });
 });
