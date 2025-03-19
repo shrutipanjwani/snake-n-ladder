@@ -51,6 +51,8 @@ export default function GamePage() {
 
   useEffect(() => {
     // Initialize socket connection
+    console.log("Socket URL (from env):", process.env.NEXT_PUBLIC_SOCKET_URL);
+
     const newSocket = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:3000", {
       transports: ['websocket']
     });
