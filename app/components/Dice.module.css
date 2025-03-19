@@ -49,12 +49,51 @@
 }
 
 .dot {
-  display: block;
-  width: 12px;
-  height: 12px;
+  position: absolute;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background-color: #333;
   box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Dot positions */
+.center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.topLeft {
+  top: 20%;
+  left: 20%;
+}
+
+.topRight {
+  top: 20%;
+  right: 20%;
+}
+
+.middleLeft {
+  top: 50%;
+  left: 20%;
+  transform: translateY(-50%);
+}
+
+.middleRight {
+  top: 50%;
+  right: 20%;
+  transform: translateY(-50%);
+}
+
+.bottomLeft {
+  bottom: 20%;
+  left: 20%;
+}
+
+.bottomRight {
+  bottom: 20%;
+  right: 20%;
 }
 
 .dots {

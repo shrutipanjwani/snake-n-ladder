@@ -1,0 +1,37 @@
+.taskButton {
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.taskButton:hover {
+  background-color: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.taskButtonText {
+  display: block;
+}
+
+.taskButtonArrow {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  color: #4f46e5;
+}
+
+.taskButton:hover .taskButtonArrow {
+  opacity: 1;
+}
+
+.taskButtonContainer {
+  margin-bottom: 1rem;
+} 

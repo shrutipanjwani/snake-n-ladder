@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Dice from '@/app/components/Dice';
 import { io, Socket } from 'socket.io-client';
 import { getTaskById } from '@/app/store/tasks';
+import styles from '@/app/components/TaskButton.module.css';
 
 interface Task {
   id: string;
@@ -84,6 +85,7 @@ export default function GamePage() {
           setGameState(prev => ({
             ...prev,
             currentPosition: data.newPosition,
+            diceValue: data.value,
             currentTask: {
               id: taskId,
               question,
@@ -100,6 +102,7 @@ export default function GamePage() {
           setGameState(prev => ({
             ...prev,
             currentPosition: data.newPosition,
+            diceValue: data.value,
             currentTask: null,
             taskId: null,
             message: data.message
@@ -307,20 +310,22 @@ export default function GamePage() {
     if (gameState.currentTask) {
       return (
         <div className="task-section p-6 bg-white rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold mb-4 text-indigo-800">Answer the Spiritual Question</h2>
-          <p className="text-lg mb-6">{gameState.currentTask.question}</p>
-          <div className="space-y-4 flex flex-col gap-4">
+          <h2 className="text-2xl font-bold mb-4 text-indigo-800">Answer the Question</h2>
+          <p className="text-lg">{gameState.currentTask.question}</p>
+          <br />
+          <div className="space-y-4">
             {gameState.currentTask.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleTaskAnswer(index)}
-                className="w-full p-4 text-left bg-gray-50 hover:bg-indigo-50 rounded-lg transition-colors duration-200 ease-in-out border border-gray-200 hover:border-indigo-300 relative group"
-              >
-                <span className="block">{option}</span>
-                <span className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600">
-                  →
-                </span>
-              </button>
+              <div key={index} className={styles.taskButtonContainer}>
+                <button
+                  onClick={() => handleTaskAnswer(index)}
+                  className={styles.taskButton}
+                >
+                  <span className={styles.taskButtonText}>{option}</span>
+                  <span className={styles.taskButtonArrow}>
+                    →
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
           <div className="mt-8 p-3 bg-blue-50 rounded-lg">
@@ -336,7 +341,11 @@ export default function GamePage() {
 
     return (
       <div className="dice-section">
-        <Dice onRoll={handleRollDice} disabled={gameEnded} />
+        <Dice 
+          onRoll={handleRollDice} 
+          disabled={gameEnded} 
+          displayValue={gameState.diceValue || 1} 
+        />
         {gameState.message && (
           <p className="mt-4 text-sm text-gray-600 animate-fade-in">{gameState.message}</p>
         )}
