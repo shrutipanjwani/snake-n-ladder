@@ -30,53 +30,7 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  const io = new Server(server, {
-    path: '/api/socket',
-    addTrailingSlash: false,
-    cors: {
-      origin: dev ? 'http://localhost:3000' : process.env.NEXT_PUBLIC_SITE_URL || 'https://snake-n-ladder-game.herokuapp.com',
-      methods: ['GET', 'POST'],
-      credentials: true
-    },
-    transports: ['websocket', 'polling'],
-    pingTimeout: 60000,
-    pingInterval: 25000
-  });
-
-  // Socket.io connection handler
-  io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
-    
-    // Player joins lobby
-    socket.on('joinLobby', (data) => {
-      console.log(`${data.name} joined the lobby`);
-      // Broadcast to all clients
-      io.emit('lobbyUpdate', { 
-        playerId: socket.id, 
-        name: data.name,
-        joined: true 
-      });
-    });
-    
-    // Player scans QR code
-    socket.on('qrScanned', (data) => {
-      console.log(`QR scanned by ${socket.id}:`, data);
-      // Process answer and emit results
-      const isCorrect = Math.random() > 0.5; // Placeholder logic
-      io.emit('taskResult', {
-        playerId: socket.id,
-        taskId: data.taskId,
-        isCorrect,
-        moveAmount: isCorrect ? 5 : -3
-      });
-    });
-    
-    // Handle disconnect
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
-      io.emit('playerLeft', { playerId: socket.id });
-    });
-  });
+  const io = new Server(server);
 
   // Socket.io connection handler
   io.on('connection', (socket) => {
@@ -723,8 +677,8 @@ app.prepare().then(() => {
     return spiritualTasks;
   }
 
-  const port = process.env.PORT || 3000;
-  server.listen(port, () => {
-    console.log(`> Ready on ${dev ? 'http://localhost:' : 'https://'}${port}`);
+  server.listen(3000, (err) => {
+    if (err) throw err;
+    console.log('> Ready on http://localhost:3000');
   });
 });

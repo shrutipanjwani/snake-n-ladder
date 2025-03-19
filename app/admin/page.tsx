@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
 import { Player } from '../lib/types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
