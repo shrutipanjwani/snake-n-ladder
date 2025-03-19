@@ -437,7 +437,7 @@ app.prepare().then(() => {
         };
         
         // Override the message to show it's a special tile
-        moveData.message = `✨ You landed on a special tile! Answer this spiritual question:`;
+        moveData.message = `✨ You landed on a special tile! Answer the question`;
       }
 
       // Update player position

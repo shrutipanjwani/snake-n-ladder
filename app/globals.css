@@ -761,11 +761,11 @@ body {
   align-items: center;
 }
 
-.dice-roll::before {
+/* .dice-roll::before {
   content: '🎲';
   margin-right: 0.5rem;
   font-size: 1.25rem;
-}
+} */
 
 .position-change {
   color: var(--primary-color);

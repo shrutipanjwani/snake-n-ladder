@@ -1,23 +1,19 @@
 // Game board configuration
 export const gameElements = [
   // Snakes (move backward)
-  { start: 48, end: 26, type: 'snake' },
-  { start: 43, end: 17, type: 'snake' },
-  { start: 39, end: 19, type: 'snake' },
-  { start: 34, end: 11, type: 'snake' },
-  { start: 25, end: 4, type: 'snake' },
+  { start: 48, end: 2, type: 'snake' },  
+  { start: 31, end: 15, type: 'snake' },  
+  { start: 21, end: 7, type: 'snake' }, 
   
   // Ladders (move forward)
-  { start: 3, end: 22, type: 'ladder' },
-  { start: 8, end: 31, type: 'ladder' },
-  { start: 16, end: 36, type: 'ladder' },
-  { start: 20, end: 41, type: 'ladder' },
-  { start: 28, end: 45, type: 'ladder' }
+  { start: 33, end: 45, type: 'ladder' }, 
+  { start: 4, end: 19, type: 'ladder' },
+  { start: 22, end: 36, type: 'ladder' }, 
 ];
 
 // Special tile positions that will trigger spiritual questions
 export const specialTilePositions = [
-  6, 13, 23, 29, 35, 42, 47
+  9, 17, 29, 44  // Black tiles with gift boxes
 ];
 
 // Helper functions
@@ -35,16 +31,16 @@ export const calculateFinalPosition = (currentPosition, diceValue) => {
   let message = '';
   let requiresTask = false;
   
-  if (newPosition > 50) {
+  if (newPosition > 49) {
     return {
       newPosition: currentPosition,
-      message: '🛑 Cannot move beyond position 50!'
+      message: '🛑 Cannot move beyond position 49!'
     };
   }
   
   if (isSpecialTile(newPosition)) {
     requiresTask = true;
-    message = `✨ You landed on a special tile! Answer this spiritual question`;
+    message = `🎁 You landed on a special tile! Answer the question`;
   }
   
   const element = getGameElement(newPosition);
@@ -61,6 +57,6 @@ export const calculateFinalPosition = (currentPosition, diceValue) => {
 // Add helper function for task result messages
 export const formatTaskResultMessage = (isCorrect, moveAmount, fromPosition, toPosition) => {
   return isCorrect
-    ? `✅ Answered spiritual question correctly! Moving forward ${moveAmount} tiles (${fromPosition} → ${toPosition})`
-    : `❌ Answered spiritual question incorrectly. Moving back ${moveAmount} tiles (${fromPosition} → ${toPosition})`;
+    ? `✅ Correct answer! Moving forward ${moveAmount} tiles (${fromPosition} → ${toPosition})`
+    : `❌ Incorrect answer. Moving back ${moveAmount} tiles (${fromPosition} → ${toPosition})`;
 }; 
