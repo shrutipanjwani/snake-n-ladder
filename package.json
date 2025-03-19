@@ -7,10 +7,11 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "heroku-postbuild": "npm install --legacy-peer-deps && npm run build"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
