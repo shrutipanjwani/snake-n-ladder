@@ -4,11 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run server.js",
-    "build": "bun run next build",
-    "start": "NODE_ENV=production bun run server.js",
-    "lint": "next lint",
-    "postinstall": "bun install"
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js",
+    "lint": "next lint"
   },
   "engines": {
     "node": "20.x"
