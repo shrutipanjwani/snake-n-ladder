@@ -71,7 +71,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
     console.log('Setting up socket connection...');
     console.log("Socket URL (from env):", process.env.NEXT_PUBLIC_SOCKET_URL);
 
-    const newSocket = io(process.env.NODE_ENV  || "http://localhost:3000", {
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL  || "http://localhost:3000", {
       transports: ['websocket']
     });
 
