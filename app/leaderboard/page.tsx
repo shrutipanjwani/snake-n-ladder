@@ -378,9 +378,9 @@ export default function LeaderboardPage() {
   return (
     <div className={styles.leaderboardContainer}>
       <div className={styles.leaderboardContent}>
-        <h1 className={styles.leaderboardTitle}>
+        {/* <h1 className={styles.leaderboardTitle}>
           The Game of Life
-        </h1>
+        </h1> */}
 
         {(gameState.winner || gameState.players.some(p => p.position >= 50)) && (
           <div className={styles.winnerCard}>

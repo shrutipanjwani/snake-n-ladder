@@ -3,7 +3,8 @@
   flex-direction: column;
   height: 100vh;
   padding: 2rem;
-  background-color: #f8f9fa;
+  /* background-color: #f8f9fa; */
+  background-image: url('/gameoflife.jpeg');
 }
 
 .leaderboardContent {
