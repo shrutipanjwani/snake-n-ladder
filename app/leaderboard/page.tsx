@@ -385,7 +385,7 @@ export default function LeaderboardPage() {
         {(gameState.winner || gameState.players.some(p => p.position >= 50)) && (
           <div className={styles.winnerCard}>
             <h2 className={styles.winnerTitle}>
-              🎉 Game Over! 🎉
+              Game Over! 🎉
             </h2>
             <p className={styles.winnerName}>
               {gameState.winner?.name || gameState.players.find(p => p.position >= 50)?.name} has won the game!

@@ -81,7 +81,7 @@ export default function GamePage() {
         {isGameOver ? (
           // Game over screen
           <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-lg text-center">
-            <h2 className="text-2xl font-bold text-indigo-600 mb-4">🎉 Game Over! 🎉</h2>
+            <h2 className="text-2xl font-bold text-indigo-600 mb-4">Game Over!</h2>
             <p className="text-xl mb-6">
               <span className="font-medium">{winner?.name}</span> has won the game!
             </p>

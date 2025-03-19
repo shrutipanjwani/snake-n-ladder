@@ -292,7 +292,7 @@ export default function GamePage() {
         <div className="text-center py-8">
           <div className="bg-green-100 rounded-lg p-6 mb-6">
             <h2 className="text-3xl font-bold text-green-800 mb-4">
-              🎉 Game Over! 🎉
+              Game Over! 
             </h2>
             <p className="text-xl text-green-700 mb-2">
               {gameState.winner?.winnerId === playerId 
