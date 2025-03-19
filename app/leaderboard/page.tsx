@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import styles from './Leaderboard.module.css';
 
 interface Move {
   diceValue: number;
@@ -41,6 +42,7 @@ export default function LeaderboardPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [movesHistory, setMovesHistory] = useState<{[playerId: string]: Move[]}>({});
   const processedMoves = useRef<Set<string>>(new Set());
+  const tableBodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const socket = io(process.env.NODE_ENV === 'development' ? `http://localhost:3000` : `https://snake-n-ladder-nine.vercel.app`, {
@@ -343,11 +345,26 @@ export default function LeaderboardPage() {
   // Create array of move indices
   const moveIndices = Array.from({ length: maxMoves }, (_, i) => i);
 
+  // Add effect to scroll to bottom when new moves are added
+  useEffect(() => {
+    if (tableBodyRef.current) {
+      // Small delay to ensure content is rendered
+      setTimeout(() => {
+        if (tableBodyRef.current) {
+          tableBodyRef.current.scrollTo({
+            top: tableBodyRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
+    }
+  }, [movesHistory, maxMoves]); // Also trigger on maxMoves changes
+
   if (!hasGameState) {
     return (
-      <div className="leaderboard-container">
-        <div className="leaderboard-content">
-          <h1 className="leaderboard-title">
+      <div className={styles.leaderboardContainer}>
+        <div className={styles.leaderboardContent}>
+          <h1 className={styles.leaderboardTitle}>
             The Game of Life
           </h1>
           <div className="loading-state">
@@ -359,39 +376,39 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className="leaderboard-container">
-      <div className="leaderboard-content">
-        <h1 className="leaderboard-title">
+    <div className={styles.leaderboardContainer}>
+      <div className={styles.leaderboardContent}>
+        <h1 className={styles.leaderboardTitle}>
           The Game of Life
         </h1>
 
-        {/* Check for winner based on position or winner state */}
         {(gameState.winner || gameState.players.some(p => p.position >= 50)) && (
-          <div className="bg-green-100 rounded-lg p-6 mb-6 border-2 border-green-500">
-            <h2 className="text-3xl font-bold text-green-800 mb-4 flex items-center justify-center">
+          <div className={styles.winnerCard}>
+            <h2 className={styles.winnerTitle}>
               🎉 Game Over! 🎉
             </h2>
-            <p className="text-xl text-green-700 text-center mb-2">
+            <p className={styles.winnerName}>
               {gameState.winner?.name || gameState.players.find(p => p.position >= 50)?.name} has won the game!
             </p>
-            <p className="text-green-600 text-center">
+            <p className={styles.winnerPosition}>
               Final Position: {gameState.winner?.position || 50}/50
             </p>
           </div>
         )}
 
-        <div className="leaderboard-card">
-          <div className="overflow-x-auto">
-            <table className="leaderboard-table">
+        <div className={styles.tableContainer}>
+          <div className={styles.tableHeader}>
+            <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className="leaderboard-move-number" style={{ color: '#333', fontSize: "1rem" }}>
+                  <th className="leaderboard-move-number" style={{ color: '#333', fontSize: "1rem", padding: "1rem" }}>
                     Move #
                   </th>
                   {gameState.players.map(player => (
                     <th 
                       key={player.id} 
                       className="leaderboard-player-header"
+                      style={{ padding: "1rem" }}
                     >
                       <div className="leaderboard-player-name">{player.name}</div>
                       <div className="leaderboard-player-position">
@@ -401,22 +418,27 @@ export default function LeaderboardPage() {
                   ))}
                 </tr>
               </thead>
+            </table>
+          </div>
+
+          <div className={styles.tableBody} ref={tableBodyRef}>
+            <table className={styles.table}>
               <tbody>
                 {moveIndices.map(index => (
                   <tr key={index}>
-                    <td className="leaderboard-move-number">
+                    <td className="leaderboard-move-number" style={{ padding: "1rem" }}>
                       {index + 1}
                     </td>
                     {gameState.players.map(player => {
                       const move = movesHistory[player.id]?.[index];
                       return (
-                        <td key={`${player.id}-${index}`}>
+                        <td key={`${player.id}-${index}`} style={{ padding: "1rem" }}>
                           {move && (
                             <div className="move-details">
                               {move.diceValue > 0 && (
                                 <>
                                   <div className="dice-roll">
-                                    Rolled: {move.diceValue}
+                                    🎲 Rolled: {move.diceValue}
                                   </div>
                                   <div className="position-change">
                                     From: {move.previousPosition} → {move.newPosition}
