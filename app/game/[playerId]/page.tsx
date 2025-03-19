@@ -53,7 +53,7 @@ export default function GamePage() {
     // Initialize socket connection
     console.log("Socket URL (from env):", process.env.NEXT_PUBLIC_SOCKET_URL);
 
-    const newSocket = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:3000", {
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000", {
       transports: ['websocket']
     });
 

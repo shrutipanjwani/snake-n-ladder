@@ -45,7 +45,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     console.log("Socket URL (from env):", process.env.NEXT_PUBLIC_SOCKET_URL);
 
-    const socket = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:3000", {
+    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000", {
       transports: ['websocket']
     });
 
