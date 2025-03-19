@@ -1,7 +1,7 @@
-import { createServer } from 'http';
-import { parse } from 'url';
-import next from 'next';
-import { Server } from 'socket.io';
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
+const { Server } = require('socket.io');
 import { calculateFinalPosition } from './app/lib/gameConfig.js';
 import { spiritualTasks } from './app/store/tasks.js';
 

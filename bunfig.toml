@@ -1,6 +1,0 @@
-[install]
-peer-dependencies = true
-optional-dependencies = true
-
-[install.scopes]
-all = { peer-dependencies = true } 

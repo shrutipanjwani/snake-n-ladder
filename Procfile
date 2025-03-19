@@ -1,1 +1,1 @@
-web: bun run dev 
+web: npm start 
