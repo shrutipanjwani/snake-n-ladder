@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // Create socket instance with optimized settings
-export const socket = io('http://localhost:3000', {
+export const socket = io(process.env.NODE_ENV === 'development' ? `http://localhost:3000` : `https://snake-n-ladder-nine.vercel.app`, {
   autoConnect: true,
   reconnection: true,
   reconnectionAttempts: 3,

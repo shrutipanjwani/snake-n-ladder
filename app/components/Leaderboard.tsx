@@ -69,7 +69,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
   // Socket connection and event listeners
   useEffect(() => {
     console.log('Setting up socket connection...');
-    const newSocket = io('http://localhost:3000', {
+    const newSocket = io(process.env.NODE_ENV === 'development' ? `http://localhost:3000` : `https://snake-n-ladder-nine.vercel.app`, {
       transports: ['websocket']
     });
 

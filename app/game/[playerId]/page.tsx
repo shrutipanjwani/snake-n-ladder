@@ -51,7 +51,7 @@ export default function GamePage() {
 
   useEffect(() => {
     // Initialize socket connection
-    const newSocket = io('http://localhost:3000', {
+    const newSocket = io(process.env.NODE_ENV === 'development' ? `http://localhost:3000` : `https://snake-n-ladder-nine.vercel.app`, {
       transports: ['websocket']
     });
 

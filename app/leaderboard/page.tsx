@@ -43,7 +43,7 @@ export default function LeaderboardPage() {
   const processedMoves = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const socket = io('http://localhost:3000', {
+    const socket = io(process.env.NODE_ENV === 'development' ? `http://localhost:3000` : `https://snake-n-ladder-nine.vercel.app`, {
       transports: ['websocket']
     });
 
