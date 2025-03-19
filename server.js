@@ -1,7 +1,7 @@
-import { createServer } from 'http';
-import { parse } from 'url';
-import next from 'next';
-import { Server } from 'socket.io';
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
+const { Server } = require('socket.io');
 import { calculateFinalPosition } from './app/lib/gameConfig.js';
 import { spiritualTasks } from './app/store/tasks.js';
 
@@ -30,7 +30,45 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  const io = new Server(server);
+  const io = new Server(server, {
+    path: '/api/socket',
+    addTrailingSlash: false,
+  });
+
+  // Socket.io connection handler
+  io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+    
+    // Player joins lobby
+    socket.on('joinLobby', (data) => {
+      console.log(`${data.name} joined the lobby`);
+      // Broadcast to all clients
+      io.emit('lobbyUpdate', { 
+        playerId: socket.id, 
+        name: data.name,
+        joined: true 
+      });
+    });
+    
+    // Player scans QR code
+    socket.on('qrScanned', (data) => {
+      console.log(`QR scanned by ${socket.id}:`, data);
+      // Process answer and emit results
+      const isCorrect = Math.random() > 0.5; // Placeholder logic
+      io.emit('taskResult', {
+        playerId: socket.id,
+        taskId: data.taskId,
+        isCorrect,
+        moveAmount: isCorrect ? 5 : -3
+      });
+    });
+    
+    // Handle disconnect
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+      io.emit('playerLeft', { playerId: socket.id });
+    });
+  });
 
   // Socket.io connection handler
   io.on('connection', (socket) => {
@@ -677,8 +715,9 @@ app.prepare().then(() => {
     return spiritualTasks;
   }
 
-  server.listen(3000, (err) => {
+  const port = process.env.PORT || 3000;
+  server.listen(port, (err) => {
     if (err) throw err;
-    console.log('> Ready on http://localhost:3000');
+    console.log(`> Ready on http://localhost:${port}`);
   });
 });
