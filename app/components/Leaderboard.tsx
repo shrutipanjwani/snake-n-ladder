@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useGameStore } from '@/app/store/gameStore';
-import { socket as globalSocket, initializeSocket } from '@/app/lib/socket';
+import { io } from 'socket.io-client';
 import { Player, TaskResult } from '../lib/types';
 
 interface MoveHistory {
@@ -69,14 +69,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
   // Socket connection and event listeners
   useEffect(() => {
     console.log('Setting up socket connection...');
-    const socketInstance = initializeSocket();
+    const newSocket = io('http://localhost:3000', {
+      transports: ['websocket']
+    });
 
-    socketInstance.on('connect', () => {
+    newSocket.on('connect', () => {
       console.log('Socket connected successfully');
     });
 
     // Handle game state updates (including task results)
-    socketInstance.on('gameStateUpdate', (data: GameStateUpdate) => {
+    newSocket.on('gameStateUpdate', (data: GameStateUpdate) => {
       console.log('Game state update received:', data);
       
       // Only create move history for task completion if it's not already recorded
@@ -118,7 +120,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
     });
 
     // Handle dice roll result
-    socketInstance.on('diceRollResult', (data: any) => {
+    newSocket.on('diceRollResult', (data: any) => {
       console.log('Dice roll result received:', data);
       
       const player = playersRef.current.find(p => p.id === data.playerId);
@@ -147,11 +149,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ players, taskResult }) => {
       updatePlayerPosition(data.playerId, data.newPosition);
     });
 
-    setSocket(socketInstance);
+    setSocket(newSocket);
 
     return () => {
       console.log('Cleaning up socket connection');
-      socketInstance.disconnect();
+      newSocket.disconnect();
     };
   }, [updatePlayerPosition]);
 
