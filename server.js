@@ -1,7 +1,7 @@
-const { createServer } = require('http');
-const { parse } = require('url');
-const next = require('next');
-const { Server } = require('socket.io');
+import { createServer } from 'http';
+import { parse } from 'url';
+import next from 'next';
+import { Server } from 'socket.io';
 import { calculateFinalPosition } from './app/lib/gameConfig.js';
 import { spiritualTasks } from './app/store/tasks.js';
 
@@ -33,6 +33,14 @@ app.prepare().then(() => {
   const io = new Server(server, {
     path: '/api/socket',
     addTrailingSlash: false,
+    cors: {
+      origin: dev ? 'http://localhost:3000' : process.env.NEXT_PUBLIC_SITE_URL || 'https://snake-n-ladder-game.herokuapp.com',
+      methods: ['GET', 'POST'],
+      credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   // Socket.io connection handler
@@ -716,8 +724,7 @@ app.prepare().then(() => {
   }
 
   const port = process.env.PORT || 3000;
-  server.listen(port, (err) => {
-    if (err) throw err;
-    console.log(`> Ready on http://localhost:${port}`);
+  server.listen(port, () => {
+    console.log(`> Ready on ${dev ? 'http://localhost:' : 'https://'}${port}`);
   });
 });
